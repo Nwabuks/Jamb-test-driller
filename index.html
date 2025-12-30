@@ -1,0 +1,638 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>JAMB Test Driller</title>
+    <link rel="stylesheet" href="style.css">
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+    <!-- Add Chart.js library -->
+    <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+    <style>
+    /* Add to existing CSS */
+    .exam-mode .tabs,
+    .exam-mode .header,
+    .exam-mode #alert {
+        display: none !important;
+    }
+    
+    .exam-mode .container {
+        border-radius: 0;
+        margin: 0;
+        min-height: 100vh;
+    }
+    
+    .exam-mode body {
+        padding: 0;
+        background: #6200ea;
+    }
+    
+    .exam-mode .tab-content {
+        padding: 20px;
+    }
+    
+    /* Full-screen exam warning */
+    .exam-warning {
+        display: none;
+        position: fixed;
+        top: 0;
+        left: 0;
+        width: 100%;
+        height: 100%;
+        background: rgba(0, 0, 0, 0.9);
+        color: white;
+        z-index: 9999;
+        text-align: center;
+        padding: 100px 20px;
+    }
+    
+    .exam-warning h2 {
+        font-size: 48px;
+        margin-bottom: 20px;
+        color: #ff9800;
+    }
+    
+    .exam-warning p {
+        font-size: 24px;
+        margin-bottom: 40px;
+    }
+    
+    .exam-warning .btn {
+        font-size: 24px;
+        padding: 15px 40px;
+    }
+
+    /* Performance Analytics Styles */
+    .performance-section {
+        margin: 40px 0;
+        padding: 20px;
+        background: #f8f9fa;
+        border-radius: 15px;
+        box-shadow: 0 4px 12px rgba(0,0,0,0.1);
+    }
+
+    .performance-header {
+        display: flex;
+        align-items: center;
+        gap: 15px;
+        margin-bottom: 25px;
+        color: #6200ea;
+    }
+
+    .performance-header h3 {
+        font-size: 24px;
+        margin: 0;
+    }
+
+    .performance-header i {
+        font-size: 28px;
+    }
+
+    .charts-container {
+        display: grid;
+        grid-template-columns: repeat(auto-fit, minmax(350px, 1fr));
+        gap: 25px;
+        margin-top: 20px;
+    }
+
+    .chart-card {
+        background: white;
+        border-radius: 12px;
+        padding: 20px;
+        box-shadow: 0 3px 10px rgba(0,0,0,0.08);
+        border: 1px solid #e0e0e0;
+        transition: transform 0.3s;
+    }
+
+    .chart-card:hover {
+        transform: translateY(-5px);
+        box-shadow: 0 6px 15px rgba(0,0,0,0.1);
+    }
+
+    .chart-title {
+        font-size: 18px;
+        font-weight: 600;
+        color: #333;
+        margin-bottom: 15px;
+        display: flex;
+        align-items: center;
+        gap: 10px;
+        padding-bottom: 10px;
+        border-bottom: 2px solid #f0f0f0;
+    }
+
+    .chart-title i {
+        color: #6200ea;
+    }
+
+    .chart-container {
+        position: relative;
+        height: 250px;
+        width: 100%;
+    }
+
+    .no-data-message {
+        text-align: center;
+        padding: 40px 20px;
+        color: #666;
+        font-style: italic;
+    }
+
+    .no-data-message i {
+        font-size: 48px;
+        margin-bottom: 15px;
+        color: #ddd;
+    }
+
+    .stats-grid {
+        display: grid;
+        grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+        gap: 15px;
+        margin-top: 25px;
+    }
+
+    .stat-box {
+        background: white;
+        padding: 20px;
+        border-radius: 10px;
+        text-align: center;
+        box-shadow: 0 2px 8px rgba(0,0,0,0.05);
+        border-left: 4px solid #6200ea;
+    }
+
+    .stat-value {
+        font-size: 32px;
+        font-weight: bold;
+        color: #6200ea;
+        margin: 10px 0;
+    }
+
+    .stat-label {
+        font-size: 14px;
+        color: #666;
+        text-transform: uppercase;
+        letter-spacing: 1px;
+    }
+
+    .best-subject {
+        border-left-color: #4caf50;
+    }
+
+    .best-subject .stat-value {
+        color: #4caf50;
+    }
+
+    .average-score {
+        border-left-color: #2196f3;
+    }
+
+    .average-score .stat-value {
+        color: #2196f3;
+    }
+
+    .total-attempts {
+        border-left-color: #ff9800;
+    }
+
+    .total-attempts .stat-value {
+        color: #ff9800;
+    }
+
+    @media (max-width: 768px) {
+        .charts-container {
+            grid-template-columns: 1fr;
+        }
+        
+        .chart-container {
+            height: 200px;
+        }
+    }
+</style>
+</head>
+<body>
+    <div class="container">
+        <!-- Header -->
+        <div class="header">
+            <h1><i class="fas fa-graduation-cap"></i> JAMB Test Driller</h1>
+            <p>Choose up to 4 subjects like real JAMB</p>
+        </div>
+        
+        <!-- Tabs -->
+        <div class="tabs">
+            <div class="tab active" onclick="switchTab('setup')">
+                <i class="fas fa-cog"></i> Setup
+            </div>
+            <div class="tab" onclick="switchTab('upload')">
+                <i class="fas fa-upload"></i> Upload
+            </div>
+            <div class="tab" onclick="switchTab('quiz')">
+                <i class="fas fa-play-circle"></i> Quiz
+            </div>
+            <div class="tab" onclick="switchTab('results')">
+                <i class="fas fa-chart-bar"></i> Results
+            </div>
+        </div>
+        
+        <!-- Alert Box -->
+        <div class="alert" id="alert"></div>
+        
+        <!-- Setup Tab -->
+        <div class="tab-content active" id="tab-setup">
+            <h2><i class="fas fa-user-graduate"></i> JAMB Subject Combination</h2>
+            <p>Select up to 4 subjects for your practice (English is now optional)</p>
+            
+            <div class="setup-options">
+                <div class="combination-info">
+                    <h3><i class="fas fa-info-circle"></i> How JAMB Works:</h3>
+                    <p>• You can choose <strong>any 4 subjects</strong> (English is optional)</p>
+                    <p>• Choose subjects from your desired course requirements</p>
+                    <p>• Maximum of 4 subjects total</p>
+                    <p>• Maximum 100 questions per subject</p>
+                </div>
+                
+                <!-- Timer Settings -->
+                <div class="timer-settings">
+                    <h3><i class="fas fa-clock"></i> Timer Settings</h3>
+                    <div class="timer-options">
+                        <div class="timer-option">
+                            <input type="radio" id="timer-jamb" name="timer" value="120" checked>
+                            <label for="timer-jamb" class="timer-label">
+                                <i class="fas fa-stopwatch"></i> Real JAMB Timing (120 minutes)
+                            </label>
+                        </div>
+                        <div class="timer-option">
+                            <input type="radio" id="timer-custom" name="timer" value="custom">
+                            <label for="timer-custom" class="timer-label">
+                                <i class="fas fa-clock"></i> Custom Time
+                            </label>
+                            <div class="custom-time-input" id="custom-time-input" style="display: block; margin-top: 10px;">
+                                <input type="number" id="custom-minutes" min="1" max="300" placeholder="Minutes" style="width: 100px; padding: 8px; border: 1px solid #ddd; border-radius: 5px;">
+                                <span style="margin: 0 10px;">minutes</span>
+                            </div>
+                        </div>
+                        <div class="timer-option">
+                            <input type="radio" id="timer-none" name="timer" value="0">
+                            <label for="timer-none" class="timer-label">
+                                <i class="fas fa-infinity"></i> No Timer (Practice Mode)
+                            </label>
+                        </div>
+                    </div>
+                </div>
+                
+                <!-- Question Count Settings -->
+                <div class="question-count-settings">
+                    <h3><i class="fas fa-question-circle"></i> Question Settings</h3>
+                    <div class="question-options">
+                        <div class="question-option">
+                            <input type="radio" id="questions-default" name="questionMode" value="default" checked>
+                            <label for="questions-default" class="question-label">
+                                <i class="fas fa-list-ol"></i> All Available Questions
+                                <span class="option-description">(Uses all uploaded questions, max 100 per subject)</span>
+                            </label>
+                        </div>
+                        <div class="question-option">
+                            <input type="radio" id="questions-custom" name="questionMode" value="custom">
+                            <label for="questions-custom" class="question-label">
+                                <i class="fas fa-sliders-h"></i> Custom Number of Questions
+                            </label>
+                            <div class="custom-questions-input" id="custom-questions-input" style="margin-top: 10px;">
+                                <div style="margin-bottom: 10px;">
+                                    <label style="display: block; margin-bottom: 5px; font-weight: 500;">Questions per subject:</label>
+                                    <input type="number" id="questions-per-subject" min="1" max="100" value="20" style="width: 100px; padding: 8px; border: 1px solid #ddd; border-radius: 5px;">
+                                    <span style="margin: 0 10px;">(Max: 100)</span>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+                
+                <div class="subject-combination">
+                    <h3>Select Your Subjects (Up to 4):</h3>
+                    <div class="combination-grid">
+                        <label class="subject-checkbox" id="english-checkbox">
+                            <input type="checkbox" name="subject" value="english">
+                            <div class="subject-icon">
+                                <i class="fas fa-language"></i>
+                            </div>
+                            <div class="subject-name">English Language</div>
+                            <div style="font-size: 12px; color: #666;">(Optional)</div>
+                        </label>
+                        
+                        <label class="subject-checkbox" id="math-checkbox">
+                            <input type="checkbox" name="subject" value="mathematics">
+                            <div class="subject-icon">
+                                <i class="fas fa-calculator"></i>
+                            </div>
+                            <div class="subject-name">Mathematics</div>
+                            <div style="font-size: 12px; color: #666;">(Science/Art)</div>
+                        </label>
+                        
+                        <label class="subject-checkbox" id="physics-checkbox">
+                            <input type="checkbox" name="subject" value="physics">
+                            <div class="subject-icon">
+                                <i class="fas fa-atom"></i>
+                            </div>
+                            <div class="subject-name">Physics</div>
+                            <div style="font-size: 12px; color: #666;">(Science)</div>
+                        </label>
+                        
+                        <label class="subject-checkbox" id="chemistry-checkbox">
+                            <input type="checkbox" name="subject" value="chemistry">
+                            <div class="subject-icon">
+                                <i class="fas fa-vial"></i>
+                            </div>
+                            <div class="subject-name">Chemistry</div>
+                            <div style="font-size: 12px; color: #666;">(Science)</div>
+                        </label>
+                        
+                        <label class="subject-checkbox" id="biology-checkbox">
+                            <input type="checkbox" name="subject" value="biology">
+                            <div class="subject-icon">
+                                <i class="fas fa-dna"></i>
+                            </div>
+                            <div class="subject-name">Biology</div>
+                            <div style="font-size: 12px; color: #666;">(Science)</div>
+                        </label>
+                        
+                        <label class="subject-checkbox" id="government-checkbox">
+                            <input type="checkbox" name="subject" value="government">
+                            <div class="subject-icon">
+                                <i class="fas fa-landmark"></i>
+                            </div>
+                            <div class="subject-name">Government</div>
+                            <div style="font-size: 12px; color: #666;">(Art/Social Science)</div>
+                        </label>
+                        
+                        <label class="subject-checkbox" id="commerce-checkbox">
+                            <input type="checkbox" name="subject" value="commerce">
+                            <div class="subject-icon">
+                                <i class="fas fa-shopping-cart"></i>
+                            </div>
+                            <div class="subject-name">Commerce</div>
+                            <div style="font-size: 12px; color: #666;">(Art/Social Science)</div>
+                        </label>
+                        
+                        <label class="subject-checkbox" id="accounting-checkbox">
+                            <input type="checkbox" name="subject" value="accounting">
+                            <div class="subject-icon">
+                                <i class="fas fa-file-invoice-dollar"></i>
+                            </div>
+                            <div class="subject-name">Accounting</div>
+                            <div style="font-size: 12px; color: #666;">(Art/Social Science)</div>
+                        </label>
+                        
+                        <label class="subject-checkbox" id="economics-checkbox">
+                            <input type="checkbox" name="subject" value="economics">
+                            <div class="subject-icon">
+                                <i class="fas fa-chart-line"></i>
+                            </div>
+                            <div class="subject-name">Economics</div>
+                            <div style="font-size: 12px; color: #666;">(Social Science)</div>
+                        </label>
+                        
+                        <label class="subject-checkbox" id="literature-checkbox">
+                            <input type="checkbox" name="subject" value="literature">
+                            <div class="subject-icon">
+                                <i class="fas fa-book"></i>
+                            </div>
+                            <div class="subject-name">Literature</div>
+                            <div style="font-size: 12px; color: #666;">(Art)</div>
+                        </label>
+                    </div>
+                    
+                    <div class="selected-subjects-display" id="selected-subjects">
+                        <!-- Selected subjects will appear here -->
+                        <div style="color: #666; font-style: italic;">No subjects selected yet</div>
+                    </div>
+                    
+                    <div style="margin-top: 20px;">
+                        <button class="btn" onclick="saveCombination()" id="save-combination-btn">
+                            <i class="fas fa-save"></i> Save Settings
+                        </button>
+                        <button class="btn btn-secondary" onclick="loadPreset('science')">
+                            <i class="fas fa-flask"></i> Load Science Preset
+                        </button>
+                        <button class="btn btn-secondary" onclick="loadPreset('art')">
+                            <i class="fas fa-paint-brush"></i> Load Art Preset
+                        </button>
+                        <button class="btn btn-secondary" onclick="loadPreset('commercial')">
+                            <i class="fas fa-briefcase"></i> Load Commercial Preset
+                        </button>
+                    </div>
+                </div>
+            </div>
+        </div>
+        
+        <!-- Upload Tab -->
+<!-- Replace the entire Upload Tab content with this: -->
+<div class="tab-content" id="tab-upload">
+    <h2><i class="fas fa-database"></i> Question Database</h2>
+    <p>Built-in questions are automatically loaded. You can still add your own questions via JSON upload.</p>
+    
+    <div style="background: #e8f5e9; border-radius: 10px; padding: 20px; margin: 20px 0;">
+        <h3><i class="fas fa-check-circle"></i> Built-in Questions Status</h3>
+        <p>✅ Preloaded questions available for all JAMB subjects</p>
+        <p>✅ No upload needed to start practicing</p>
+        <p>✅ You can still add custom questions if needed</p>
+    </div>
+    
+    <!-- Keep the original upload box but make it optional -->
+    <div class="upload-box" onclick="document.getElementById('jsonFile').click()">
+        <div class="upload-icon">
+            <i class="fas fa-cloud-upload-alt"></i>
+        </div>
+        <div class="upload-text">Click to upload ADDITIONAL questions (Optional)</div>
+        <p style="color: #666; margin: 15px 0;">or drag and drop here</p>
+        <input type="file" id="jsonFile" class="file-input" accept=".json">
+        <button class="btn">
+            <i class="fas fa-folder-open"></i> Browse Files
+        </button>
+    </div>
+    
+    <div class="status-box">
+        <h3>Question Bank Status (Max: 100 per subject)</h3>
+        <div class="status-grid" id="status-grid">
+            <!-- Status items will be loaded here -->
+        </div>
+        
+        <div style="margin-top: 20px; padding-top: 20px; border-top: 2px solid #ddd;">
+            <button class="btn" onclick="resetToBuiltInQuestions()" style="background: #4caf50;">
+                <i class="fas fa-redo"></i> Reset to Built-in Questions
+            </button>
+            <button class="btn" onclick="clearAllQuestions()" style="background: #f44336; margin-left: 10px;">
+                <i class="fas fa-trash"></i> Clear All Questions
+            </button>
+        </div>
+    </div>
+    
+    <div style="background: #fff8e1; border-radius: 10px; padding: 20px; margin-top: 30px;">
+        <h3><i class="fas fa-info-circle"></i> Adding Your Own Questions</h3>
+        <p>Use this format if you want to add more questions:</p>
+        <pre style="background: #f5f5f5; padding: 15px; border-radius: 8px; overflow-x: auto;">
+{
+    "subject": "english",
+    "questions": [
+        {
+            "question": "Your question here?",
+            "options": ["Option A", "Option B", "Option C", "Option D"],
+            "correctAnswer": 0,
+            "explanation": "Explanation here"
+        }
+    ]
+}</pre>
+    </div>
+</div>
+        
+        <!-- Quiz Tab -->
+        <div class="tab-content" id="tab-quiz">
+            <div id="quizContainer">
+                <!-- Quiz content will be loaded here dynamically -->
+            </div>
+        </div>
+        
+        <!-- Results Tab -->
+        <div class="tab-content" id="tab-results">
+    <div id="resultsContainer">
+        <h2><i class="fas fa-trophy"></i> Your Performance</h2>
+        <p>View your results across all subjects and track your progress</p>
+        
+        <div class="results-grid" id="results-grid">
+            <div style="text-align: center; padding: 40px 20px; grid-column: 1 / -1;">
+                <i class="fas fa-chart-line" style="font-size: 64px; color: #ddd; margin-bottom: 20px;"></i>
+                <h3>No Results Yet</h3>
+                <p>Complete a quiz to see your performance here</p>
+            </div>
+        </div>
+
+        <!-- Performance Analytics Section -->
+        <div class="performance-section" id="performance-section" style="display: none;">
+            <div class="performance-header">
+                <i class="fas fa-chart-line"></i>
+                <h3>Performance Analytics</h3>
+            </div>
+            
+            <!-- Statistics Summary -->
+            <div class="stats-grid" id="stats-grid">
+                <!-- Stats will be populated here -->
+            </div>
+            
+            <!-- Charts Container -->
+            <div class="charts-container">
+                <!-- Overall Performance Chart -->
+                <div class="chart-card">
+                    <div class="chart-title">
+                        <i class="fas fa-line-chart"></i> Progress Over Time
+                    </div>
+                    <div class="chart-container">
+                        <canvas id="overallProgressChart"></canvas>
+                    </div>
+                    <p style="font-size: 14px; color: #666; margin-top: 10px; text-align: center;">
+                        Track your overall improvement across attempts
+                    </p>
+                </div>
+                
+                <!-- Subject Performance Chart -->
+                <div class="chart-card">
+                    <div class="chart-title">
+                        <i class="fas fa-bar-chart"></i> Subject Comparison
+                    </div>
+                    <div class="chart-container">
+                        <canvas id="subjectPerformanceChart"></canvas>
+                    </div>
+                    <p style="font-size: 14px; color: #666; margin-top: 10px; text-align: center;">
+                        Compare your performance across different subjects
+                    </p>
+                </div>
+                
+                <!-- Strengths & Weaknesses Chart -->
+                <div class="chart-card">
+                    <div class="chart-title">
+                        <i class="fas fa-radar-chart"></i> Strengths & Weaknesses
+                    </div>
+                    <div class="chart-container">
+                        <canvas id="radarChart"></canvas>
+                    </div>
+                    <p style="font-size: 14px; color: #666; margin-top: 10px; text-align: center;">
+                        Identify your strongest and weakest subjects
+                    </p>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+    </div>
+
+<!-- Custom Quiz Modal -->
+<div class="modal" id="customQuizModal">
+    <div class="modal-content">
+        <div class="modal-header">
+            <h3><i class="fas fa-sliders-h"></i> Custom Quiz Settings</h3>
+            <button class="modal-close" onclick="closeCustomQuizModal()">&times;</button>
+        </div>
+        <div class="modal-body">
+            <div style="margin-bottom: 20px;">
+                <h4>Set Questions for Each Subject:</h4>
+                <p style="color: #666; margin-bottom: 15px;">Choose how many questions you want from each subject</p>
+                <div id="custom-quiz-subjects-list" style="margin: 10px 0;">
+                    <!-- Selected subjects with individual question inputs will appear here -->
+                </div>
+            </div>
+            
+            <div style="margin-bottom: 20px;">
+                <h4><i class="fas fa-clock"></i> Timer:</h4>
+                <div style="background: #f5f5f5; padding: 15px; border-radius: 8px;">
+                    <p><strong>Will use timer settings from Setup tab:</strong></p>
+                    <p id="custom-quiz-timer-info">120 minutes (Real JAMB Timing)</p>
+                </div>
+            </div>
+            
+            <div style="background: #e8f5e9; padding: 15px; border-radius: 8px; margin-top: 20px;">
+                <h4><i class="fas fa-calculator"></i> Quiz Summary:</h4>
+                <div style="margin-top: 10px;">
+                    <p><strong>Total Questions:</strong> <span id="custom-total-questions">0</span> questions</p>
+                    <p><strong>Subjects:</strong> <span id="custom-subjects-count">0</span> subjects</p>
+                    <p><strong>Time:</strong> <span id="custom-timer-display">120 minutes</span></p>
+                </div>
+                <div id="subject-breakdown" style="margin-top: 10px; font-size: 14px; color: #666;">
+                    <!-- Subject breakdown will appear here -->
+                </div>
+            </div>
+        </div>
+        <div class="modal-footer">
+            <button class="btn btn-secondary" onclick="closeCustomQuizModal()">
+                Cancel
+            </button>
+            <button class="btn" onclick="startCustomQuiz()">
+                <i class="fas fa-play"></i> Start Custom Quiz
+            </button>
+        </div>
+    </div>
+</div>
+
+
+<!-- Full-Screen Exam Warning -->
+<div class="exam-warning" id="exam-warning">
+    <div>
+        <h2>⚠️ JAMB EXAM MODE ⚠️</h2>
+        <p>You are about to start a JAMB Simulation Exam</p>
+        <p><strong>Rules:</strong></p>
+        <ul style="text-align: left; max-width: 600px; margin: 20px auto; font-size: 18px;">
+            <li>You cannot navigate away from the exam</li>
+            <li>All tabs and navigation will be hidden</li>
+            <li>Timer will run continuously</li>
+            <li>You can only exit by clicking "End Exam"</li>
+            <li>Browser back/close will show warning</li>
+        </ul>
+        <p>Are you ready to begin?</p>
+        <button class="btn" onclick="startExam()" style="background: #4caf50; margin: 10px;">
+            <i class="fas fa-play"></i> START EXAM
+        </button>
+        <button class="btn btn-secondary" onclick="cancelExam()" style="margin: 10px;">
+            <i class="fas fa-times"></i> CANCEL
+        </button>
+    </div>
+</div>
+
+    <script src="script.js"></script>
+</body>
+</html>

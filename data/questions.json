@@ -1,0 +1,251 @@
+{
+  "version": "1.0",
+  "lastUpdated": "2024-01-15",
+  "subjects": [
+    {
+      "subject": "english",
+      "name": "English Language",
+      "questions": [
+        {
+          "question": "Which of the following sentences is grammatically correct?",
+          "options": [
+            "She don't like apples",
+            "She doesn't likes apples",
+            "She doesn't like apples",
+            "She not like apples"
+          ],
+          "correctAnswer": 2,
+          "explanation": "'She' is third person singular, so it takes 'does not' (doesn't) + base form of verb."
+        },
+        {
+          "question": "What is the plural form of 'analysis'?",
+          "options": [
+            "Analysises",
+            "Analyses",
+            "Analysis",
+            "Analysises"
+          ],
+          "correctAnswer": 1,
+          "explanation": "The plural of analysis is 'analyses' (change -is to -es)."
+        },
+        {
+          "question": "Identify the adverb in: 'He ran quickly to the store.'",
+          "options": [
+            "He",
+            "ran",
+            "quickly",
+            "store"
+          ],
+          "correctAnswer": 2,
+          "explanation": "'Quickly' modifies the verb 'ran', telling how he ran."
+        },
+        {
+          "question": "Choose the correctly spelled word:",
+          "options": [
+            "Accomodation",
+            "Acommodation",
+            "Accommodation",
+            "Acomodation"
+          ],
+          "correctAnswer": 2,
+          "explanation": "'Accommodation' has double 'c' and double 'm'."
+        },
+        {
+          "question": "What is a synonym for 'benevolent'?",
+          "options": [
+            "Cruel",
+            "Kind",
+            "Stingy",
+            "Selfish"
+          ],
+          "correctAnswer": 1,
+          "explanation": "Benevolent means well-meaning and kindly."
+        }
+      ]
+    },
+    {
+      "subject": "mathematics",
+      "name": "Mathematics",
+      "questions": [
+        {
+          "question": "If x + 5 = 12, what is the value of x?",
+          "options": [
+            "5",
+            "6",
+            "7",
+            "8"
+          ],
+          "correctAnswer": 2,
+          "explanation": "x = 12 - 5 = 7"
+        },
+        {
+          "question": "What is 15% of 200?",
+          "options": [
+            "20",
+            "30",
+            "25",
+            "35"
+          ],
+          "correctAnswer": 1,
+          "explanation": "15% of 200 = 0.15 × 200 = 30"
+        },
+        {
+          "question": "Solve for y: 2y - 4 = 10",
+          "options": [
+            "5",
+            "6",
+            "7",
+            "8"
+          ],
+          "correctAnswer": 2,
+          "explanation": "2y = 10 + 4 = 14, so y = 14 ÷ 2 = 7"
+        },
+        {
+          "question": "What is the area of a rectangle with length 8cm and width 5cm?",
+          "options": [
+            "13 cm²",
+            "26 cm²",
+            "40 cm²",
+            "45 cm²"
+          ],
+          "correctAnswer": 2,
+          "explanation": "Area = length × width = 8 × 5 = 40 cm²"
+        },
+        {
+          "question": "Simplify: (3x²y)(2xy³)",
+          "options": [
+            "6x²y³",
+            "6x³y⁴",
+            "5x³y⁴",
+            "5x²y³"
+          ],
+          "correctAnswer": 1,
+          "explanation": "3×2 = 6, x²×x = x³, y×y³ = y⁴"
+        }
+      ]
+    },
+    {
+      "subject": "physics",
+      "name": "Physics",
+      "questions": [
+        {
+          "question": "What is the SI unit of force?",
+          "options": [
+            "Joule",
+            "Watt",
+            "Newton",
+            "Pascal"
+          ],
+          "correctAnswer": 2,
+          "explanation": "Force is measured in Newtons (N)."
+        },
+        {
+          "question": "Which law states that every action has an equal and opposite reaction?",
+          "options": [
+            "Newton's First Law",
+            "Newton's Second Law",
+            "Newton's Third Law",
+            "Ohm's Law"
+          ],
+          "correctAnswer": 2,
+          "explanation": "Newton's Third Law of Motion."
+        },
+        {
+          "question": "What is the acceleration due to gravity on Earth (approx.)?",
+          "options": [
+            "9.8 m/s²",
+            "10 m/s²",
+            "8.9 m/s²",
+            "11 m/s²"
+          ],
+          "correctAnswer": 0,
+          "explanation": "Standard gravity is approximately 9.8 m/s²."
+        }
+      ]
+    },
+    {
+      "subject": "chemistry",
+      "name": "Chemistry",
+      "questions": [
+        {
+          "question": "What is the chemical symbol for gold?",
+          "options": [
+            "Go",
+            "Gd",
+            "Au",
+            "Ag"
+          ],
+          "correctAnswer": 2,
+          "explanation": "Au comes from Latin 'aurum' meaning gold."
+        },
+        {
+          "question": "What is the pH of pure water?",
+          "options": [
+            "5",
+            "6",
+            "7",
+            "8"
+          ],
+          "correctAnswer": 2,
+          "explanation": "Pure water is neutral with pH 7."
+        }
+      ]
+    },
+    {
+      "subject": "biology",
+      "name": "Biology",
+      "questions": [
+        {
+          "question": "Which organ is responsible for pumping blood?",
+          "options": [
+            "Liver",
+            "Lungs",
+            "Heart",
+            "Kidneys"
+          ],
+          "correctAnswer": 2,
+          "explanation": "The heart pumps blood throughout the body."
+        },
+        {
+          "question": "What is the powerhouse of the cell?",
+          "options": [
+            "Nucleus",
+            "Mitochondria",
+            "Ribosome",
+            "Endoplasmic reticulum"
+          ],
+          "correctAnswer": 1,
+          "explanation": "Mitochondria produce energy (ATP) for the cell."
+        }
+      ]
+    },
+    {
+      "subject": "government",
+      "name": "Government",
+      "questions": [
+        {
+          "question": "What is the supreme law of Nigeria?",
+          "options": [
+            "The National Assembly Act",
+            "The Constitution",
+            "The Presidential Decree",
+            "The Judiciary Act"
+          ],
+          "correctAnswer": 1,
+          "explanation": "The Constitution is the supreme law of Nigeria."
+        },
+        {
+          "question": "How many states are in Nigeria?",
+          "options": [
+            "34",
+            "36",
+            "37",
+            "38"
+          ],
+          "correctAnswer": 1,
+          "explanation": "Nigeria has 36 states and the Federal Capital Territory."
+        }
+      ]
+    }
+  ]
+}
