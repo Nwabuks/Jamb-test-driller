@@ -1,0 +1,46 @@
+{
+  "subject": "english",
+  "topic": "Grammar",
+  "questions": [
+    {
+      "question": "Choose the correct sentence:",
+      "options": [
+        "She don't like apples",
+        "She doesn't likes apples",
+        "She doesn't like apples",
+        "She don't likes apples"
+      ],
+      "correctAnswer": 2,
+      "explanation": "The correct form is 'She doesn't like apples' because 'she' requires 'doesn't' and the base form 'like'."
+    },
+    {
+      "question": "Which word is a preposition?",
+      "options": ["Run", "Beautiful", "Under", "Quickly"],
+      "correctAnswer": 2,
+      "explanation": "'Under' is a preposition that shows position or location."
+    },
+    {
+      "question": "What is the plural of 'child'?",
+      "options": ["Childs", "Children", "Childes", "Child"],
+      "correctAnswer": 1,
+      "explanation": "The plural of 'child' is 'children'."
+    },
+    {
+      "question": "Identify the verb in the sentence: 'The cat sleeps peacefully on the mat.'",
+      "options": ["cat", "sleeps", "peacefully", "mat"],
+      "correctAnswer": 1,
+      "explanation": "'Sleeps' is the verb that shows the action of the cat."
+    },
+    {
+      "question": "Which sentence is in the past tense?",
+      "options": [
+        "I am going to school",
+        "I go to school",
+        "I will go to school",
+        "I went to school"
+      ],
+      "correctAnswer": 3,
+      "explanation": "'Went' is the past tense of 'go', indicating the action happened in the past."
+    }
+  ]
+}

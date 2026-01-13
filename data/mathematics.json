@@ -1,0 +1,36 @@
+{
+  "subject": "mathematics",
+  "topic": "Algebra",
+  "questions": [
+    {
+      "question": "Solve for x: 2x + 7 = 15",
+      "options": ["x = 4", "x = 5", "x = 6", "x = 7"],
+      "correctAnswer": 0,
+      "explanation": "2x + 7 = 15 → 2x = 15 - 7 = 8 → x = 8/2 = 4"
+    },
+    {
+      "question": "What is the value of 5² + 3³?",
+      "options": ["34", "52", "25", "44"],
+      "correctAnswer": 1,
+      "explanation": "5² = 25, 3³ = 27, so 25 + 27 = 52"
+    },
+    {
+      "question": "If y = 3x - 5, what is y when x = 4?",
+      "options": ["7", "9", "11", "13"],
+      "correctAnswer": 0,
+      "explanation": "y = 3(4) - 5 = 12 - 5 = 7"
+    },
+    {
+      "question": "Simplify: (x + 3)(x - 2)",
+      "options": ["x² + x - 6", "x² - x - 6", "x² + 5x + 6", "x² - 5x + 6"],
+      "correctAnswer": 0,
+      "explanation": "(x + 3)(x - 2) = x² - 2x + 3x - 6 = x² + x - 6"
+    },
+    {
+      "question": "What is the solution to the equation: 3x - 8 = 4?",
+      "options": ["x = 4", "x = 5", "x = 6", "x = 7"],
+      "correctAnswer": 0,
+      "explanation": "3x - 8 = 4 → 3x = 4 + 8 = 12 → x = 12/3 = 4"
+    }
+  ]
+}
