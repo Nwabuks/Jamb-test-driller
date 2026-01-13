@@ -207,23 +207,209 @@
             height: 200px;
         }
     }
+    
+    /* Topics Tab Styles */
+    .topic-category {
+        background: white;
+        border-radius: 10px;
+        padding: 20px;
+        margin: 20px 0;
+        box-shadow: 0 3px 10px rgba(0,0,0,0.08);
+        border: 1px solid #e0e0e0;
+    }
+    
+    .topic-category-header {
+        display: flex;
+        align-items: center;
+        gap: 10px;
+        margin-bottom: 15px;
+        padding-bottom: 10px;
+        border-bottom: 2px solid #f0f0f0;
+    }
+    
+    .topic-category-header i {
+        font-size: 24px;
+        color: #6200ea;
+    }
+    
+    .topic-category-header h3 {
+        font-size: 20px;
+        color: #333;
+        margin: 0;
+    }
+    
+    .topics-grid {
+        display: grid;
+        grid-template-columns: repeat(auto-fill, minmax(250px, 1fr));
+        gap: 15px;
+        margin-top: 15px;
+    }
+    
+    .topic-checkbox {
+        background: #f8f9fa;
+        border: 2px solid #e0e0e0;
+        border-radius: 8px;
+        padding: 15px;
+        cursor: pointer;
+        transition: all 0.3s;
+    }
+    
+    .topic-checkbox:hover {
+        border-color: #6200ea;
+        background: #f3e5f5;
+    }
+    
+    .topic-checkbox.selected {
+        background: #e8eaf6;
+        border-color: #6200ea;
+    }
+    
+    .topic-checkbox input {
+        display: none;
+    }
+    
+    .topic-name {
+        font-weight: 600;
+        margin-bottom: 5px;
+        color: #333;
+    }
+    
+    .topic-count {
+        font-size: 14px;
+        color: #666;
+    }
+    
+    .topic-actions {
+        margin-top: 10px;
+        padding-top: 10px;
+        border-top: 1px solid #e0e0e0;
+    }
+    
+    .select-all-btn {
+        background: #6200ea;
+        color: white;
+        border: none;
+        padding: 8px 15px;
+        border-radius: 5px;
+        cursor: pointer;
+        font-size: 14px;
+        margin-right: 10px;
+    }
+    
+    .deselect-all-btn {
+        background: #666;
+        color: white;
+        border: none;
+        padding: 8px 15px;
+        border-radius: 5px;
+        cursor: pointer;
+        font-size: 14px;
+    }
+    /* Add to the existing topic-checkbox styles */
+.topic-checkbox {
+    position: relative;
+    cursor: pointer;
+    user-select: none;
+    -webkit-user-select: none;
+    -moz-user-select: none;
+    -ms-user-select: none;
+}
+
+.topic-checkbox * {
+    pointer-events: none;
+}
+
+.topic-checkbox:hover {
+    border-color: #6200ea;
+    background: #f3e5f5;
+}
+
+.topic-checkbox.selected {
+    background: #e8eaf6;
+    border-color: #6200ea;
+}
+/* Add to the existing styles */
+.select-all-btn {
+    background: #4caf50;
+    color: white;
+    border: none;
+    padding: 8px 15px;
+    border-radius: 5px;
+    cursor: pointer;
+    font-size: 14px;
+    margin-right: 10px;
+    display: inline-flex;
+    align-items: center;
+    gap: 5px;
+}
+
+.select-all-btn:hover {
+    background: #388e3c;
+    transform: translateY(-1px);
+}
+
+.deselect-all-btn {
+    background: #f44336;
+    color: white;
+    border: none;
+    padding: 8px 15px;
+    border-radius: 5px;
+    cursor: pointer;
+    font-size: 14px;
+    display: inline-flex;
+    align-items: center;
+    gap: 5px;
+}
+
+.deselect-all-btn:hover {
+    background: #d32f2f;
+    transform: translateY(-1px);
+}
+
+.topic-actions {
+    margin-bottom: 15px;
+    padding: 10px;
+    background: #f8f9fa;
+    border-radius: 8px;
+}
 </style>
 </head>
 <body>
-    <div class="container">
-        <!-- Header -->
-        <div class="header">
-            <h1><i class="fas fa-graduation-cap"></i> JAMB Test Driller</h1>
-            <p>Choose up to 4 subjects like real JAMB</p>
+    <div class="container"> 
+<!-- Header -->
+<div class="header">
+    <div style="text-align: center; position: relative;">
+        <h1><i class="fas fa-graduation-cap"></i> JAMB Test Driller</h1>
+        <p>Choose up to 4 subjects like real JAMB</p>
+        
+        <div style="
+            position: absolute;
+            top: 10px;
+            right: 20px;
+            background: rgba(255, 255, 255, 0.2);
+            padding: 5px 15px;
+            border-radius: 20px;
+            font-size: 12px;
+            display: flex;
+            align-items: center;
+            gap: 8px;
+        ">
+            <i class="fas fa-code" style="color: #ff9800;"></i>
+            <span style="color: #fff;">by</span>
+            <span style="color: #ff9800; font-weight: bold; letter-spacing: 1px;">
+                NWABUKS
+            </span>
         </div>
+    </div>
+</div>
         
         <!-- Tabs -->
         <div class="tabs">
             <div class="tab active" onclick="switchTab('setup')">
                 <i class="fas fa-cog"></i> Setup
             </div>
-            <div class="tab" onclick="switchTab('upload')">
-                <i class="fas fa-upload"></i> Upload
+            <div class="tab" onclick="switchTab('topics')">
+                <i class="fas fa-book"></i> Topics
             </div>
             <div class="tab" onclick="switchTab('quiz')">
                 <i class="fas fa-play-circle"></i> Quiz
@@ -424,30 +610,27 @@
             </div>
         </div>
         
-        <!-- Upload Tab -->
-<div class="tab-content" id="tab-upload">
-    <h2><i class="fas fa-database"></i> Pre-loaded Question Database</h2>
-    <p>✅ All JAMB subjects come with pre-loaded questions ready for practice</p>
-    
-    <div style="background: #e8f5e9; border-radius: 10px; padding: 20px; margin: 20px 0;">
-        <h3><i class="fas fa-check-circle"></i> Built-in Questions Status</h3>
-        <p>✅ 50+ questions pre-loaded for each subject</p>
-        <p>✅ Ready for JAMB simulation immediately</p>
-        <p>✅ No setup or upload required</p>
-        <p>✅ Questions follow JAMB syllabus pattern</p>
-    </div>
-    
-    <div class="status-box">
-        <h3>Question Bank Status</h3>
-        <p style="color: #666; margin-bottom: 15px; font-size: 14px;">
-            <i class="fas fa-info-circle"></i> All subjects have pre-loaded questions. 
-            During quizzes, maximum 100 questions per subject will be used.
-        </p>
-        <div class="status-grid" id="status-grid">
-            <!-- Status items will be loaded here -->
+        <!-- Topics Tab -->
+        <div class="tab-content" id="tab-topics">
+            <h2><i class="fas fa-book"></i> Topic Selection</h2>
+            <p>Select specific topics to focus on within each subject</p>
+            
+            <div style="background: #e8f5e9; border-radius: 10px; padding: 20px; margin: 20px 0;">
+                <h3><i class="fas fa-check-circle"></i> Topics Status</h3>
+                <p>✅ Questions automatically loaded from <code>data/</code> folder</p>
+                <p>✅ Select topics to customize your practice</p>
+                <p>✅ All topics selected by default</p>
+            </div>
+            
+            <div id="topics-container">
+                <!-- Topics will be loaded here dynamically -->
+                <div style="text-align: center; padding: 40px 20px; color: #666;">
+                    <i class="fas fa-spinner fa-spin" style="font-size: 48px; margin-bottom: 20px;"></i>
+                    <h3>Loading Topics...</h3>
+                    <p>Loading questions from data folder...</p>
+                </div>
+            </div>
         </div>
-    </div>
-</div>
         
         <!-- Quiz Tab -->
         <div class="tab-content" id="tab-quiz">
@@ -455,7 +638,7 @@
                 <!-- Quiz content will be loaded here dynamically -->
                 <div style="text-align: center; padding: 50px 20px;">
                     <h3>Ready for JAMB Practice?</h3>
-                    <p>Built-in questions are automatically loaded for your selected subjects</p>
+                    <p>Questions loaded from data folder for your selected subjects</p>
                     <div class="subjects-grid" style="margin: 30px auto; max-width: 600px;" id="quiz-subjects-grid">
                         <div style="grid-column: 1 / -1; text-align: center; padding: 20px; color: #666;">
                             <i class="fas fa-info-circle" style="font-size: 24px; margin-bottom: 10px;"></i>
@@ -649,7 +832,11 @@
         </div>
     </div>
 </div>
-
+<!-- Credits Badge -->
+<div class="credits">
+    <i class="fas fa-heart" style="color: #f44336; margin-right: 5px;"></i>
+    Built by <strong>Nwabuks</strong>
+</div>
     <script src="script.js"></script>
 </body>
 </html>
