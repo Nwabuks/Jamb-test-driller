@@ -1086,10 +1086,147 @@ body {
     background: rgba(0, 0, 0, 0.95);
     color: white;
     z-index: 9999;
-    text-align: center;
-    padding: 100px 20px;
     font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+    overflow-y: auto; /* Enable scrolling */
+    -webkit-overflow-scrolling: touch; /* Smooth scrolling on iOS */
 }
+.exam-warning-content {
+    max-width: 800px;
+    width: 95%;
+    margin: 20px auto;
+    padding: 30px;
+    background: rgba(0, 0, 0, 0.9);
+    border-radius: 20px;
+    border: 3px solid #ff9800;
+    box-shadow: 0 10px 40px rgba(255, 152, 0, 0.3);
+    position: relative;
+    min-height: auto; /* Remove fixed height */
+}
+.exam-warning-header {
+    text-align: center;
+    margin-bottom: 25px;
+    position: sticky;
+    top: 0;
+    background: rgba(0, 0, 0, 0.9);
+    padding: 15px;
+    border-radius: 15px;
+    z-index: 10;
+}
+
+.exam-warning-header i {
+    font-size: 60px;
+    color: #ff9800;
+    margin-bottom: 15px;
+    display: block;
+}
+.exam-warning-header h2 {
+    font-size: 28px;
+    color: #ff9800;
+    margin: 0;
+    line-height: 1.3;
+}
+.exam-warning-header h2 {
+    font-size: 28px;
+    color: #ff9800;
+    margin: 0;
+    line-height: 1.3;
+}
+
+.warning-subtitle {
+    font-size: 18px;
+    margin-bottom: 25px;
+    color: #fff;
+    text-align: center;
+    line-height: 1.5;
+}
+
+.warning-rules {
+    background: rgba(255, 255, 255, 0.1);
+    border-radius: 15px;
+    padding: 20px;
+    margin-bottom: 20px;
+}
+
+.warning-rules h3 {
+    color: #ff9800;
+    margin-bottom: 15px;
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    font-size: 20px;
+}
+
+.warning-rules ul {
+    list-style: none;
+    padding: 0;
+    margin: 0;
+}
+
+.warning-rules li {
+    color: white;
+    margin-bottom: 12px;
+    padding: 12px 15px;
+    background: rgba(255, 255, 255, 0.05);
+    border-radius: 8px;
+    display: flex;
+    align-items: center;
+    gap: 12px;
+    font-size: 16px;
+    line-height: 1.4;
+}
+
+.warning-rules li i {
+    color: #ff9800;
+    font-size: 16px;
+    min-width: 24px;
+}
+
+.warning-time {
+    background: rgba(98, 0, 234, 0.2);
+    border-radius: 15px;
+    padding: 20px;
+    margin-bottom: 25px;
+    text-align: center;
+}
+
+.warning-time h3 {
+    color: #bb86fc;
+    margin-bottom: 10px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    gap: 10px;
+    font-size: 20px;
+}
+
+.warning-time p {
+    color: white;
+    font-size: 20px;
+    margin: 0;
+    line-height: 1.4;
+}
+
+.ready-text {
+    font-size: 22px;
+    color: #4caf50;
+    text-align: center;
+    font-weight: bold;
+    margin: 25px 0;
+    line-height: 1.3;
+}
+
+.exam-warning-buttons {
+    display: flex;
+    flex-direction: column;
+    gap: 15px;
+    margin-top: 25px;
+    position: sticky;
+    bottom: 0;
+    background: rgba(0, 0, 0, 0.9);
+    padding: 15px;
+    border-radius: 15px;
+}
+
 
 .exam-warning h2 {
     font-size: 48px;
@@ -1142,6 +1279,154 @@ body {
     border-radius: 30px;
 }
 
+.btn-exam-start {
+    background: linear-gradient(135deg, #4caf50, #2e7d32);
+    font-size: 20px;
+    padding: 18px 25px;
+    border-radius: 15px;
+    font-weight: bold;
+    width: 100%;
+    border: none;
+    cursor: pointer;
+    transition: transform 0.2s;
+}
+
+.btn-exam-start:hover {
+    transform: translateY(-2px);
+}
+
+.btn-exam-cancel {
+    background: linear-gradient(135deg, #f44336, #c62828);
+    font-size: 18px;
+    padding: 16px 25px;
+    border-radius: 15px;
+    width: 100%;
+    border: none;
+    cursor: pointer;
+    transition: transform 0.2s;
+}
+
+.btn-exam-cancel:hover {
+    transform: translateY(-2px);
+}
+
+/* Mobile-specific adjustments */
+@media (max-width: 768px) {
+    .exam-warning-content {
+        width: 95%;
+        margin: 10px auto;
+        padding: 20px 15px;
+        border-radius: 15px;
+    }
+    
+    .exam-warning-header {
+        padding: 10px;
+        position: relative;
+    }
+    
+    .exam-warning-header i {
+        font-size: 50px;
+    }
+    
+    .exam-warning-header h2 {
+        font-size: 24px;
+    }
+    
+    .warning-subtitle {
+        font-size: 16px;
+    }
+    
+    .warning-rules h3 {
+        font-size: 18px;
+    }
+    
+    .warning-rules li {
+        font-size: 15px;
+        padding: 10px 12px;
+    }
+    
+    .warning-time {
+        padding: 15px;
+    }
+    
+    .warning-time h3 {
+        font-size: 18px;
+    }
+    
+    .warning-time p {
+        font-size: 18px;
+    }
+    
+    .ready-text {
+        font-size: 20px;
+        margin: 20px 0;
+    }
+    
+    .btn-exam-start,
+    .btn-exam-cancel {
+        font-size: 18px;
+        padding: 16px;
+    }
+    
+    .exam-warning-buttons {
+        padding: 10px;
+        gap: 12px;
+    }
+}
+
+/* Small phone optimization */
+@media (max-width: 480px) {
+    .exam-warning-content {
+        padding: 15px 10px;
+    }
+    
+    .exam-warning-header i {
+        font-size: 45px;
+    }
+    
+    .exam-warning-header h2 {
+        font-size: 22px;
+    }
+    
+    .warning-subtitle {
+        font-size: 15px;
+    }
+    
+    .warning-rules li {
+        font-size: 14px;
+    }
+    
+    .warning-time p {
+        font-size: 16px;
+    }
+    
+    .ready-text {
+        font-size: 18px;
+    }
+    
+    .btn-exam-start,
+    .btn-exam-cancel {
+        font-size: 16px;
+        padding: 14px;
+    }
+}
+
+/* Landscape mode optimization */
+@media (max-height: 600px) and (orientation: landscape) {
+    .exam-warning-content {
+        max-height: 90vh;
+        overflow-y: auto;
+    }
+    
+    .exam-warning-header {
+        position: relative;
+    }
+    
+    .exam-warning-buttons {
+        position: relative;
+    }
+}
+
 /* Exam header */
 .exam-header {
     background: linear-gradient(to right, #3700b3, #6200ea);
@@ -1176,4 +1461,49 @@ body {
     -webkit-user-select: text;
     -moz-user-select: text;
     -ms-user-select: text;
+}
+@media (max-width: 768px) {
+    .container {
+        margin: 5px;
+        border-radius: 10px;
+        overflow: hidden;
+    }
+    
+    .tab-content {
+        padding: 15px !important;
+    }
+    
+    .header {
+        padding: 20px 15px;
+    }
+    
+    .header h1 {
+        font-size: 24px;
+    }
+    
+    /* Setup tab mobile */
+    .combination-grid {
+        grid-template-columns: repeat(2, 1fr);
+        gap: 10px;
+    }
+    
+    .subject-checkbox {
+        padding: 12px;
+    }
+    
+    /* Upload tab mobile */
+    .upload-box {
+        padding: 25px 15px;
+    }
+    
+    /* Custom quiz modal mobile */
+    .modal-content {
+        width: 95%;
+        max-height: 85vh;
+    }
+    
+    /* Results tab mobile */
+    .results-grid {
+        grid-template-columns: 1fr;
+    }
 }

@@ -242,13 +242,14 @@
             <p>Select up to 4 subjects for your practice (English is now optional)</p>
             
             <div class="setup-options">
-                <div class="combination-info">
-                    <h3><i class="fas fa-info-circle"></i> How JAMB Works:</h3>
-                    <p>• You can choose <strong>any 4 subjects</strong> (English is optional)</p>
-                    <p>• Choose subjects from your desired course requirements</p>
-                    <p>• Maximum of 4 subjects total</p>
-                    <p>• Maximum 100 questions per subject</p>
-                </div>
+<div class="combination-info">
+    <h3><i class="fas fa-info-circle"></i> How JAMB Works:</h3>
+    <p>• You can choose <strong>any 4 subjects</strong> (English is optional)</p>
+    <p>• Choose subjects from your desired course requirements</p>
+    <p>• Maximum of 4 subjects total</p>
+    <p>• Maximum 100 questions per subject <strong>during exam</strong></p>
+    <p>• Unlimited questions can be stored in question bank</p>
+</div>
                 
                 <!-- Timer Settings -->
                 <div class="timer-settings">
@@ -424,62 +425,27 @@
         </div>
         
         <!-- Upload Tab -->
-<!-- Replace the entire Upload Tab content with this: -->
 <div class="tab-content" id="tab-upload">
-    <h2><i class="fas fa-database"></i> Question Database</h2>
-    <p>Built-in questions are automatically loaded. You can still add your own questions via JSON upload.</p>
+    <h2><i class="fas fa-database"></i> Pre-loaded Question Database</h2>
+    <p>✅ All JAMB subjects come with pre-loaded questions ready for practice</p>
     
     <div style="background: #e8f5e9; border-radius: 10px; padding: 20px; margin: 20px 0;">
         <h3><i class="fas fa-check-circle"></i> Built-in Questions Status</h3>
-        <p>✅ Preloaded questions available for all JAMB subjects</p>
-        <p>✅ No upload needed to start practicing</p>
-        <p>✅ You can still add custom questions if needed</p>
-    </div>
-    
-    <!-- Keep the original upload box but make it optional -->
-    <div class="upload-box" onclick="document.getElementById('jsonFile').click()">
-        <div class="upload-icon">
-            <i class="fas fa-cloud-upload-alt"></i>
-        </div>
-        <div class="upload-text">Click to upload ADDITIONAL questions (Optional)</div>
-        <p style="color: #666; margin: 15px 0;">or drag and drop here</p>
-        <input type="file" id="jsonFile" class="file-input" accept=".json">
-        <button class="btn">
-            <i class="fas fa-folder-open"></i> Browse Files
-        </button>
+        <p>✅ 50+ questions pre-loaded for each subject</p>
+        <p>✅ Ready for JAMB simulation immediately</p>
+        <p>✅ No setup or upload required</p>
+        <p>✅ Questions follow JAMB syllabus pattern</p>
     </div>
     
     <div class="status-box">
-        <h3>Question Bank Status (Max: 100 per subject)</h3>
+        <h3>Question Bank Status</h3>
+        <p style="color: #666; margin-bottom: 15px; font-size: 14px;">
+            <i class="fas fa-info-circle"></i> All subjects have pre-loaded questions. 
+            During quizzes, maximum 100 questions per subject will be used.
+        </p>
         <div class="status-grid" id="status-grid">
             <!-- Status items will be loaded here -->
         </div>
-        
-        <div style="margin-top: 20px; padding-top: 20px; border-top: 2px solid #ddd;">
-            <button class="btn" onclick="resetToBuiltInQuestions()" style="background: #4caf50;">
-                <i class="fas fa-redo"></i> Reset to Built-in Questions
-            </button>
-            <button class="btn" onclick="clearAllQuestions()" style="background: #f44336; margin-left: 10px;">
-                <i class="fas fa-trash"></i> Clear All Questions
-            </button>
-        </div>
-    </div>
-    
-    <div style="background: #fff8e1; border-radius: 10px; padding: 20px; margin-top: 30px;">
-        <h3><i class="fas fa-info-circle"></i> Adding Your Own Questions</h3>
-        <p>Use this format if you want to add more questions:</p>
-        <pre style="background: #f5f5f5; padding: 15px; border-radius: 8px; overflow-x: auto;">
-{
-    "subject": "english",
-    "questions": [
-        {
-            "question": "Your question here?",
-            "options": ["Option A", "Option B", "Option C", "Option D"],
-            "correctAnswer": 0,
-            "explanation": "Explanation here"
-        }
-    ]
-}</pre>
     </div>
 </div>
         
@@ -487,6 +453,39 @@
         <div class="tab-content" id="tab-quiz">
             <div id="quizContainer">
                 <!-- Quiz content will be loaded here dynamically -->
+                <div style="text-align: center; padding: 50px 20px;">
+                    <h3>Ready for JAMB Practice?</h3>
+                    <p>Built-in questions are automatically loaded for your selected subjects</p>
+                    <div class="subjects-grid" style="margin: 30px auto; max-width: 600px;" id="quiz-subjects-grid">
+                        <div style="grid-column: 1 / -1; text-align: center; padding: 20px; color: #666;">
+                            <i class="fas fa-info-circle" style="font-size: 24px; margin-bottom: 10px;"></i>
+                            <p>Select subjects in the Setup tab first</p>
+                        </div>
+                    </div>
+                    <div style="background: #f5f5f5; padding: 20px; border-radius: 10px; margin: 20px auto; max-width: 600px;">
+                        <h4><i class="fas fa-cog"></i> Quiz Settings</h4>
+                        <div style="margin: 15px 0;">
+                            <div style="display: flex; align-items: center; justify-content: space-between; margin-bottom: 10px;">
+                                <span>Questions per subject:</span>
+                                <span id="selected-questions-count">All available</span>
+                            </div>
+                            <div style="display: flex; align-items: center; justify-content: space-between; margin-bottom: 10px;">
+                                <span>Total questions:</span>
+                                <span id="total-questions-count">0</span>
+                            </div>
+                            <div style="display: flex; align-items: center; justify-content: space-between;">
+                                <span>Timer:</span>
+                                <span id="selected-timer">120 minutes</span>
+                            </div>
+                        </div>
+                    </div>
+                    <button class="btn" onclick="startFullJAMBQuiz()" id="start-jamb-btn" disabled>
+                        <i class="fas fa-play"></i> Start Full JAMB Simulation
+                    </button>
+                    <button class="btn btn-secondary" onclick="practiceCustomQuiz()" id="custom-quiz-btn" disabled>
+                        <i class="fas fa-sliders-h"></i> Custom Quiz
+                    </button>
+                </div>
             </div>
         </div>
         
@@ -612,24 +611,42 @@
 
 <!-- Full-Screen Exam Warning -->
 <div class="exam-warning" id="exam-warning">
-    <div>
-        <h2>⚠️ JAMB EXAM MODE ⚠️</h2>
-        <p>You are about to start a JAMB Simulation Exam</p>
-        <p><strong>Rules:</strong></p>
-        <ul style="text-align: left; max-width: 600px; margin: 20px auto; font-size: 18px;">
-            <li>You cannot navigate away from the exam</li>
-            <li>All tabs and navigation will be hidden</li>
-            <li>Timer will run continuously</li>
-            <li>You can only exit by clicking "End Exam"</li>
-            <li>Browser back/close will show warning</li>
-        </ul>
-        <p>Are you ready to begin?</p>
-        <button class="btn" onclick="startExam()" style="background: #4caf50; margin: 10px;">
-            <i class="fas fa-play"></i> START EXAM
-        </button>
-        <button class="btn btn-secondary" onclick="cancelExam()" style="margin: 10px;">
-            <i class="fas fa-times"></i> CANCEL
-        </button>
+    <div class="exam-warning-content">
+        <div class="exam-warning-header">
+            <i class="fas fa-exclamation-triangle"></i>
+            <h2>JAMB EXAM MODE</h2>
+        </div>
+        
+        <div class="exam-warning-body">
+            <p class="warning-subtitle">You are about to start a JAMB Simulation Exam</p>
+            
+            <div class="warning-rules">
+                <h3><i class="fas fa-gavel"></i> Exam Rules:</h3>
+                <ul>
+                    <li><i class="fas fa-ban"></i> No navigating away from exam</li>
+                    <li><i class="fas fa-eye-slash"></i> All tabs will be hidden</li>
+                    <li><i class="fas fa-clock"></i> Timer runs continuously</li>
+                    <li><i class="fas fa-sign-out-alt"></i> Exit only via "End Exam" button</li>
+                    <li><i class="fas fa-exclamation-circle"></i> Browser back/close will warn</li>
+                </ul>
+            </div>
+            
+            <div class="warning-time">
+                <h3><i class="fas fa-stopwatch"></i> Time Settings:</h3>
+                <p><strong id="exam-timer-display">120 minutes</strong> total time</p>
+            </div>
+            
+            <p class="ready-text">Are you ready to begin?</p>
+        </div>
+        
+        <div class="exam-warning-buttons">
+            <button class="btn btn-exam-start" onclick="startExam()">
+                <i class="fas fa-play"></i> START EXAM
+            </button>
+            <button class="btn btn-exam-cancel" onclick="cancelExam()">
+                <i class="fas fa-times"></i> CANCEL
+            </button>
+        </div>
     </div>
 </div>
 

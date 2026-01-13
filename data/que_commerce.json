@@ -1,0 +1,115 @@
+{
+  "subject": "commerce",
+  "questions": [
+    {
+      "question": "Which of the following is NOT a function of commerce?",
+      "options": [
+        "Transportation of goods",
+        "Warehousing of goods",
+        "Production of goods",
+        "Insurance of goods"
+      ],
+      "correctAnswer": 2,
+      "explanation": "Production of goods is part of manufacturing, not commerce. Commerce deals with trade and aids to trade."
+    },
+    {
+      "question": "The main purpose of warehousing is to:",
+      "options": [
+        "Produce goods",
+        "Store goods until they are needed",
+        "Sell goods directly to consumers",
+        "Transport goods to markets"
+      ],
+      "correctAnswer": 1,
+      "explanation": "Warehousing involves storing goods until they are needed, bridging the gap between production and consumption."
+    },
+    {
+      "question": "Which of the following is a characteristic of money?",
+      "options": [
+        "Indivisibility",
+        "Lack of general acceptability",
+        "Portability",
+        "Fluctuating value"
+      ],
+      "correctAnswer": 2,
+      "explanation": "Money must be portable to be useful for transactions. Other characteristics include durability, divisibility, and general acceptability."
+    },
+    {
+      "question": "The difference between gross profit and net profit is:",
+      "options": [
+        "Net profit includes expenses",
+        "Gross profit excludes operating expenses",
+        "There is no difference",
+        "Gross profit is always higher"
+      ],
+      "correctAnswer": 1,
+      "explanation": "Gross profit is revenue minus cost of goods sold. Net profit is gross profit minus operating expenses, taxes, and other deductions."
+    },
+    {
+      "question": "Which of the following is NOT a form of business organization?",
+      "options": [
+        "Sole proprietorship",
+        "Partnership",
+        "Cooperative society",
+        "Stock exchange"
+      ],
+      "correctAnswer": 3,
+      "explanation": "Stock exchange is a market where securities are traded, not a form of business organization. The others are all business structures."
+    },
+    {
+      "question": "The main function of a wholesaler is to:",
+      "options": [
+        "Sell directly to consumers",
+        "Buy from retailers and sell to manufacturers",
+        "Act as an intermediary between manufacturers and retailers",
+        "Produce goods for sale"
+      ],
+      "correctAnswer": 2,
+      "explanation": "Wholesalers buy goods in bulk from manufacturers and sell them in smaller quantities to retailers."
+    },
+    {
+      "question": "Which of the following documents is issued by a seller to a buyer?",
+      "options": [
+        "Receipt",
+        "Invoice",
+        "Statement of account",
+        "All of the above"
+      ],
+      "correctAnswer": 3,
+      "explanation": "An invoice is sent by seller to buyer showing goods sold and amount due. Receipts and statements are also issued by sellers."
+    },
+    {
+      "question": "The term 'balance of trade' refers to:",
+      "options": [
+        "Difference between imports and exports of visible items",
+        "Difference between total imports and exports including services",
+        "Total value of a country's foreign exchange",
+        "Government budget surplus or deficit"
+      ],
+      "correctAnswer": 0,
+      "explanation": "Balance of trade specifically refers to the difference between visible (tangible) exports and imports, excluding services."
+    },
+    {
+      "question": "Which of the following is an example of an aid to trade?",
+      "options": [
+        "Manufacturing",
+        "Banking",
+        "Farming",
+        "Mining"
+      ],
+      "correctAnswer": 1,
+      "explanation": "Banking facilitates trade by providing financial services. Manufacturing, farming, and mining are production activities, not aids to trade."
+    },
+    {
+      "question": "The main source of capital for a sole proprietorship is:",
+      "options": [
+        "Public subscription",
+        "Government grant",
+        "Personal savings and loans",
+        "Sale of shares"
+      ],
+      "correctAnswer": 2,
+      "explanation": "Sole proprietors typically fund their businesses through personal savings, reinvested profits, and personal loans since they operate alone."
+    }
+  ]
+}

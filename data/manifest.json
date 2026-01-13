@@ -1,0 +1,18 @@
+{
+    "name": "JAMB Test Driller Question Files",
+    "version": "1.0",
+    "description": "List of all question files to load",
+    "questionFiles": [
+        "questions.json",
+        "que_english.json",
+        "que_mathematics.json", 
+        "que_physics.json",
+        "que_chemistry.json",
+        "que_biology.json",
+        "que_government.json",
+        "que_commerce.json",
+        "que_accounting.json",
+        "que_economics.json",
+        "que_literature.json"
+    ]
+}

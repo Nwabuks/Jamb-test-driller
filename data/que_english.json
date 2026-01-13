@@ -1,0 +1,11 @@
+{
+    "subject": "english",
+    "questions": [
+        {
+            "question": "What is the plural of 'analysis'?",
+            "options": ["Analysises", "Analyses", "Analysis", "Analysies"],
+            "correctAnswer": 1,
+            "explanation": "The plural of analysis is 'analyses'."
+        }
+    ]
+}

@@ -13,10 +13,9 @@ const JAMB_APP = {
         economics: { name: "Economics", icon: "chart-line" },
         literature: { name: "Literature", icon: "book" }
     },
-    
     // User's selected subjects (max 4)
     selectedSubjects: [],
-    // Question bank for all subjects (max 100 per subject)
+    // Question bank for all subjects (UNLIMITED storage)
     questions: {},
     // Settings
     settings: {
@@ -37,12 +36,15 @@ const JAMB_APP = {
     // Results history
     results: [],
     // Constants
-    MAX_QUESTIONS_PER_SUBJECT: 100,
+    MAX_QUESTIONS_PER_QUIZ: 100,  // Maximum questions per subject during quiz
     MAX_SUBJECTS: 4
 };
+
+// Chart instances
 window.overallChart = null;
 window.subjectChart = null;
 window.radarChart = null;
+
 // ================ EXAM MODE FUNCTIONS ================
 let examMode = false;
 let pendingExamStart = null;
@@ -106,13 +108,34 @@ function disableExamMode() {
 
 function showExamWarning() {
     const examWarning = document.getElementById('exam-warning');
-    examWarning.style.display = 'block';
+    const examTimerDisplay = document.getElementById('exam-timer-display');
+    
+    // Display current timer settings with better formatting
+    let timerText = '';
+    if (JAMB_APP.settings.timer.enabled) {
+        const minutes = JAMB_APP.settings.timer.minutes;
+        if (minutes === 120) {
+            timerText = '⏱️ 120 minutes (Real JAMB Timing)';
+        } else {
+            timerText = `⏱️ ${minutes} minutes (Custom Time)`;
+        }
+    } else {
+        timerText = '⏱️ No Timer (Practice Mode)';
+    }
+    
+    examTimerDisplay.innerHTML = timerText;
+    
+    examWarning.style.display = 'flex';
+    examWarning.style.alignItems = 'flex-start';
+    examWarning.style.padding = '20px 0';
+    document.body.style.overflow = 'hidden';
     
     // Store the exam start function
     pendingExamStart = function() {
         enableExamMode();
         examWarning.style.display = 'none';
-        startJAMBQuiz(); // This will start the actual quiz
+        document.body.style.overflow = '';
+        startJAMBQuiz();
     };
 }
 
@@ -126,6 +149,7 @@ function startExam() {
 function cancelExam() {
     const examWarning = document.getElementById('exam-warning');
     examWarning.style.display = 'none';
+    document.body.style.overflow = '';
     pendingExamStart = null;
 }
 
@@ -243,14 +267,8 @@ function updateQuestionSettings() {
     if (selectedMode.value === 'custom') {
         const questionsPerSubject = document.getElementById('questions-per-subject');
         JAMB_APP.settings.questions.perSubject = parseInt(questionsPerSubject.value) || 20;
-        if (JAMB_APP.settings.questions.perSubject > JAMB_APP.MAX_QUESTIONS_PER_SUBJECT) {
-            JAMB_APP.settings.questions.perSubject = JAMB_APP.MAX_QUESTIONS_PER_SUBJECT;
-            if (questionsPerSubject) {
-                questionsPerSubject.value = JAMB_APP.MAX_QUESTIONS_PER_SUBJECT;
-            }
-        }
+        saveToStorage();
     }
-    saveToStorage();
 }
 
 // ================ TIMER FUNCTIONS ================
@@ -351,10 +369,6 @@ function loadFromStorage() {
             Object.keys(JAMB_APP.allSubjects).forEach(subject => {
                 if (!JAMB_APP.questions[subject]) {
                     JAMB_APP.questions[subject] = [];
-                }
-                // Ensure we don't exceed max questions
-                if (JAMB_APP.questions[subject].length > JAMB_APP.MAX_QUESTIONS_PER_SUBJECT) {
-                    JAMB_APP.questions[subject] = JAMB_APP.questions[subject].slice(0, JAMB_APP.MAX_QUESTIONS_PER_SUBJECT);
                 }
             });
             
@@ -550,38 +564,191 @@ async function loadBuiltInQuestions() {
     try {
         console.log('Loading built-in questions...');
         
-        // Try to load from data/questions.json
-        const response = await fetch('data/questions.json');
-        
-        if (!response.ok) {
-            throw new Error('Failed to load built-in questions');
-        }
-        
-        const data = await response.json();
-        
         // Check if we already have questions from storage
         let totalExistingQuestions = 0;
         Object.values(JAMB_APP.questions).forEach(arr => {
             totalExistingQuestions += arr.length;
         });
         
+        // Only load built-in questions if we have no existing questions
         if (totalExistingQuestions === 0) {
-            // Load built-in questions only if no existing questions
-            loadQuestionsFromData(data);
-            showAlert(`Loaded built-in questions for ${data.subjects.length} subjects`, 'success');
+            console.log('No existing questions found. Loading from built-in files...');
+            
+            // Try to load sample questions first (embedded in code)
+            await loadEmbeddedSampleQuestions();
+            
+            // Then try to load from external files (if available)
+            await tryLoadExternalQuestionFiles();
+            
+            // Save after loading
+            saveToStorage();
+            
+            // Show success message
+            const subjectCount = Object.keys(JAMB_APP.questions).filter(
+                subject => JAMB_APP.questions[subject].length > 0
+            ).length;
+            
+            const totalLoadedQuestions = Object.values(JAMB_APP.questions)
+                .reduce((sum, arr) => sum + arr.length, 0);
+            
+            if (totalLoadedQuestions > 0) {
+                showAlert(`✅ Loaded ${totalLoadedQuestions} sample questions for ${subjectCount} subjects`, 'success');
+            } else {
+                showAlert('No question files found. Sample questions loaded.', 'info');
+            }
+            
+            // Update UI
+            updateStatusGrid();
+            updateQuizTab();
+            
             return true;
         } else {
-            // Just update the data structure without overriding
             console.log(`Using existing ${totalExistingQuestions} questions from storage`);
             return false;
         }
         
     } catch (error) {
-        console.error('Error loading built-in questions:', error);
+        console.error('Error in loadBuiltInQuestions:', error);
         showAlert('Could not load built-in questions. Using sample questions instead.', 'error');
-        loadSampleQuestions();
+        loadSampleQuestions(); // Fallback to hardcoded sample
         return false;
     }
+}
+
+// Helper function to load embedded sample questions
+async function loadEmbeddedSampleQuestions() {
+    console.log('Loading embedded sample questions...');
+    
+    const sampleQuestions = {
+        subjects: [
+            {
+                subject: "english",
+                questions: [
+                    {
+                        "question": "Choose the correct spelling:",
+                        "options": ["Accomodation", "Acommodation", "Accommodation", "Acomodation"],
+                        "correctAnswer": 2,
+                        "explanation": "'Accommodation' has double 'c' and double 'm'."
+                    },
+                    {
+                        "question": "What is the plural of 'analysis'?",
+                        "options": ["Analysises", "Analyses", "Analysis", "Analysises"],
+                        "correctAnswer": 1,
+                        "explanation": "The plural of analysis is 'analyses'."
+                    },
+                    {
+                        "question": "Identify the grammatically correct sentence:",
+                        "options": ["He don't like apples", "He doesn't likes apples", "He doesn't like apples", "He don't likes apples"],
+                        "correctAnswer": 2,
+                        "explanation": "'He' is third person singular, so it requires 'doesn't' and the base form 'like'."
+                    }
+                ]
+            },
+            {
+                subject: "mathematics",
+                questions: [
+                    {
+                        "question": "If x + 5 = 12, what is x?",
+                        "options": ["5", "6", "7", "8"],
+                        "correctAnswer": 2,
+                        "explanation": "x = 12 - 5 = 7"
+                    },
+                    {
+                        "question": "What is 15% of 200?",
+                        "options": ["20", "30", "25", "35"],
+                        "correctAnswer": 1,
+                        "explanation": "15% of 200 = 0.15 × 200 = 30"
+                    },
+                    {
+                        "question": "Solve for y: 2y - 8 = 10",
+                        "options": ["y = 6", "y = 7", "y = 8", "y = 9"],
+                        "correctAnswer": 3,
+                        "explanation": "2y = 18, so y = 9"
+                    }
+                ]
+            },
+            {
+                subject: "physics",
+                questions: [
+                    {
+                        "question": "What is the SI unit of force?",
+                        "options": ["Joule", "Newton", "Watt", "Pascal"],
+                        "correctAnswer": 1,
+                        "explanation": "Force is measured in Newtons (N)."
+                    },
+                    {
+                        "question": "Which law states that for every action there is an equal and opposite reaction?",
+                        "options": ["Newton's First Law", "Newton's Second Law", "Newton's Third Law", "Ohm's Law"],
+                        "correctAnswer": 2,
+                        "explanation": "Newton's Third Law describes action-reaction pairs."
+                    }
+                ]
+            },
+            {
+                subject: "chemistry",
+                questions: [
+                    {
+                        "question": "What is the chemical symbol for gold?",
+                        "options": ["Go", "Gd", "Au", "Ag"],
+                        "correctAnswer": 2,
+                        "explanation": "Gold is represented by Au from Latin 'aurum'."
+                    },
+                    {
+                        "question": "What is the pH of pure water?",
+                        "options": ["5", "6", "7", "8"],
+                        "correctAnswer": 2,
+                        "explanation": "Pure water is neutral with pH 7 at 25°C."
+                    }
+                ]
+            }
+        ]
+    };
+    
+    const added = addQuestionsFromData(sampleQuestions);
+    console.log(`✅ Added ${added} embedded sample questions`);
+    return added;
+}
+
+// Helper function to try loading external files
+async function tryLoadExternalQuestionFiles() {
+    console.log('Trying to load external question files...');
+    
+    const possibleFilePaths = [
+        'data/questions.json',
+        'questions.json',
+        'data/manifest.json',
+        'manifest.json',
+        'data/que_english.json',
+        'que_english.json',
+        'data/que_mathematics.json',
+        'que_mathematics.json'
+    ];
+    
+    let loadedAnyExternal = false;
+    
+    for (const filePath of possibleFilePaths) {
+        try {
+            console.log(`Trying to fetch: ${filePath}`);
+            const response = await fetch(filePath);
+            
+            if (response.ok) {
+                const data = await response.json();
+                const added = addQuestionsFromData(data);
+                
+                if (added > 0) {
+                    loadedAnyExternal = true;
+                    console.log(`✅ Successfully loaded ${added} questions from ${filePath}`);
+                }
+            } else {
+                console.log(`⚠️ Could not load ${filePath} (HTTP ${response.status})`);
+            }
+        } catch (error) {
+            console.log(`❌ Error loading ${filePath}: ${error.message}`);
+            // Continue trying other files
+        }
+    }
+    
+    return loadedAnyExternal;
 }
 
 function loadQuestionsFromData(data) {
@@ -596,10 +763,9 @@ function loadQuestionsFromData(data) {
     data.subjects.forEach(subjectData => {
         const subject = subjectData.subject.toLowerCase();
         if (JAMB_APP.allSubjects[subject] && Array.isArray(subjectData.questions)) {
-            // Take only up to MAX_QUESTIONS_PER_SUBJECT
-            const questionsToAdd = subjectData.questions.slice(0, JAMB_APP.MAX_QUESTIONS_PER_SUBJECT);
-            JAMB_APP.questions[subject] = [...questionsToAdd];
-            console.log(`Loaded ${questionsToAdd.length} questions for ${subject}`);
+            // Take ALL questions (no limit for storage)
+            JAMB_APP.questions[subject] = [...subjectData.questions];
+            console.log(`Loaded ${subjectData.questions.length} questions for ${subject}`);
         }
     });
     
@@ -607,20 +773,21 @@ function loadQuestionsFromData(data) {
 }
 
 function resetToBuiltInQuestions() {
-    if (confirm('This will replace ALL your current questions with built-in questions. Continue?')) {
+    if (confirm('This will replace ALL your current questions with built-in questions from manifest. Continue?')) {
         // Clear all current questions
         Object.keys(JAMB_APP.questions).forEach(subject => {
             JAMB_APP.questions[subject] = [];
         });
         
-        // Reload built-in questions
+        // Reload built-in questions from manifest
         loadBuiltInQuestions();
         updateStatusGrid();
         updateQuizTab();
-        showAlert('Reset to built-in questions completed', 'success');
+        showAlert('Reset to built-in questions completed. All files from manifest reloaded.', 'success');
     }
 }
 
+// ================ UPLOAD TAB FUNCTIONS ================
 // ================ UPLOAD TAB FUNCTIONS ================
 function updateStatusGrid() {
     const grid = document.getElementById('status-grid');
@@ -637,20 +804,19 @@ function updateStatusGrid() {
     JAMB_APP.selectedSubjects.forEach(subject => {
         const subjectInfo = JAMB_APP.allSubjects[subject];
         const count = JAMB_APP.questions[subject]?.length || 0;
-        const maxReached = count >= JAMB_APP.MAX_QUESTIONS_PER_SUBJECT;
         const statusItem = document.createElement('div');
         statusItem.className = `status-item ${count > 0 ? 'loaded' : ''}`;
-        if (maxReached) {
-            statusItem.style.borderColor = '#f44336';
-            statusItem.style.background = '#ffebee';
-        }
         statusItem.innerHTML = `
             <div class="status-subject">
                 <i class="fas fa-${subjectInfo.icon}"></i> ${subjectInfo.name}
             </div>
-            <div class="status-count">${count}/${JAMB_APP.MAX_QUESTIONS_PER_SUBJECT}</div>
-            <div style="font-size: 12px;">questions</div>
-            ${maxReached ? '<div style="font-size: 11px; color: #f44336; margin-top: 5px;">Maximum reached</div>' : ''}
+            <div class="status-count">${count} questions</div>
+            <div style="font-size: 12px;">available</div>
+            ${count >= 100 ? 
+                '<div style="font-size: 11px; color: #4caf50; margin-top: 5px;">✓ Ready for JAMB quiz</div>' : 
+                count > 0 ? 
+                '<div style="font-size: 11px; color: #ff9800; margin-top: 5px;">Available for practice</div>' :
+                '<div style="font-size: 11px; color: #f44336; margin-top: 5px;">No questions</div>'}
         `;
         grid.appendChild(statusItem);
     });
@@ -659,36 +825,37 @@ function updateStatusGrid() {
 function setupFileUpload() {
     const fileInput = document.getElementById('jsonFile');
     const uploadBox = document.querySelector('.upload-box');
-
+    
     fileInput.addEventListener('change', function (e) {
         if (this.files.length > 0) {
             processJSONFile(this.files[0]);
             this.value = '';
         }
     });
-
+    
     ['dragenter', 'dragover', 'dragleave', 'drop'].forEach(eventName => {
         uploadBox.addEventListener(eventName, preventDefaults, false);
     });
-
+    
     function preventDefaults(e) {
         e.preventDefault();
         e.stopPropagation();
     }
-
+    
     ['dragenter', 'dragover'].forEach(eventName => {
         uploadBox.addEventListener(eventName, () => {
             uploadBox.style.background = '#e8eaf6';
             uploadBox.style.borderColor = '#3700b3';
         }, false);
     });
+    
     ['dragleave', 'drop'].forEach(eventName => {
         uploadBox.addEventListener(eventName, () => {
             uploadBox.style.background = '#f8f9ff';
             uploadBox.style.borderColor = '#6200ea';
         }, false);
     });
-
+    
     uploadBox.addEventListener('drop', function (e) {
         const files = e.dataTransfer.files;
         if (files.length > 0) {
@@ -702,6 +869,13 @@ function processJSONFile(file) {
         showAlert('Please select a JSON file', 'error');
         return;
     }
+    
+    // Check if filename starts with "que_"
+    if (!file.name.toLowerCase().startsWith('que_')) {
+        showAlert('Please select a JSON file that starts with "que_"', 'error');
+        return;
+    }
+    
     const reader = new FileReader();
     reader.onload = function (e) {
         try {
@@ -712,7 +886,7 @@ function processJSONFile(file) {
                 saveToStorage();
                 updateStatusGrid();
                 updateQuizTab();
-                showAlert(`Added ${added} question(s) successfully!`, 'success');
+                showAlert(`Added ${added} question(s) successfully from ${file.name}!`, 'success');
             } else {
                 showAlert('Invalid JSON format. Check the guide.', 'error');
             }
@@ -748,32 +922,28 @@ function addQuestionsFromData(data) {
             const subject = subjectData.subject.toLowerCase();
             if (JAMB_APP.allSubjects[subject] && JAMB_APP.questions[subject] !== undefined) {
                 const questions = subjectData.questions || [];
-                const availableSlots = JAMB_APP.MAX_QUESTIONS_PER_SUBJECT - JAMB_APP.questions[subject].length;
-                const questionsToAdd = questions.slice(0, availableSlots);
-                JAMB_APP.questions[subject].push(...questionsToAdd);
-                addedCount += questionsToAdd.length;
-                if (questions.length > availableSlots) {
-                    showAlert(`Maximum ${JAMB_APP.MAX_QUESTIONS_PER_SUBJECT} questions reached for ${JAMB_APP.allSubjects[subject].name}. ${questions.length - availableSlots} questions were not added.`, 'error');
-                }
+                // UNLIMITED - add all questions
+                JAMB_APP.questions[subject].push(...questions);
+                addedCount += questions.length;
+                console.log(`Added ${questions.length} questions to ${subject} (Total: ${JAMB_APP.questions[subject].length})`);
             }
         });
     } else if (data.subject && Array.isArray(data.questions)) {
         const subject = data.subject.toLowerCase();
         if (JAMB_APP.allSubjects[subject] && JAMB_APP.questions[subject] !== undefined) {
             const questions = data.questions || [];
-            const availableSlots = JAMB_APP.MAX_QUESTIONS_PER_SUBJECT - JAMB_APP.questions[subject].length;
-            const questionsToAdd = questions.slice(0, availableSlots);
-            JAMB_APP.questions[subject].push(...questionsToAdd);
-            addedCount += questionsToAdd.length;
-            if (questions.length > availableSlots) {
-                showAlert(`Maximum ${JAMB_APP.MAX_QUESTIONS_PER_SUBJECT} questions reached for ${JAMB_APP.allSubjects[subject].name}. ${questions.length - availableSlots} questions were not added.`, 'error');
-            }
+            // UNLIMITED - add all questions
+            JAMB_APP.questions[subject].push(...questions);
+            addedCount += questions.length;
+            console.log(`Added ${questions.length} questions to ${subject} (Total: ${JAMB_APP.questions[subject].length})`);
         }
     }
     return addedCount;
 }
 
 function loadSampleQuestions() {
+    console.log('Loading fallback sample questions...');
+    
     const sampleData = {
         subjects: [
             {
@@ -812,6 +982,7 @@ function loadSampleQuestions() {
             }
         ]
     };
+    
     const added = addQuestionsFromData(sampleData);
     saveToStorage();
     updateStatusGrid();
@@ -857,14 +1028,16 @@ function openCustomQuizModal() {
     JAMB_APP.selectedSubjects.forEach(subject => {
         const subjectInfo = JAMB_APP.allSubjects[subject];
         const questionCount = JAMB_APP.questions[subject]?.length || 0;
-        const maxQuestions = Math.min(questionCount, JAMB_APP.MAX_QUESTIONS_PER_SUBJECT);
+        
+        // Maximum questions for quiz (100 per subject)
+        const maxQuestionsForQuiz = Math.min(questionCount, JAMB_APP.MAX_QUESTIONS_PER_QUIZ);
         
         // Default questions per subject
         let defaultQuestions = 0;
         if (JAMB_APP.settings.questions.mode === 'custom') {
-            defaultQuestions = Math.min(JAMB_APP.settings.questions.perSubject, maxQuestions);
+            defaultQuestions = Math.min(JAMB_APP.settings.questions.perSubject, maxQuestionsForQuiz);
         } else {
-            defaultQuestions = Math.min(Math.floor(maxQuestions / 2), 10);
+            defaultQuestions = Math.min(Math.floor(maxQuestionsForQuiz / 2), 10);
         }
         
         const subjectDiv = document.createElement('div');
@@ -881,6 +1054,9 @@ function openCustomQuizModal() {
                     <div>
                         <div style="font-weight: 500;">${subjectInfo.name}</div>
                         <div style="font-size: 12px; color: #666;">Available: ${questionCount} questions</div>
+                        <div style="font-size: 11px; color: #ff9800; margin-top: 3px;">
+                            Max ${JAMB_APP.MAX_QUESTIONS_PER_QUIZ} per quiz
+                        </div>
                     </div>
                 </div>
             </div>
@@ -889,11 +1065,11 @@ function openCustomQuizModal() {
                        class="subject-question-count" 
                        data-subject="${subject}"
                        min="1" 
-                       max="${maxQuestions}"
+                       max="${maxQuestionsForQuiz}"
                        value="${defaultQuestions}"
                        style="width: 70px; padding: 8px; border: 1px solid #ddd; border-radius: 5px; text-align: center;">
                 <div style="font-size: 12px; color: #666; min-width: 80px;">
-                    / ${maxQuestions} max
+                    / ${maxQuestionsForQuiz} max
                 </div>
             </div>
         `;
@@ -908,7 +1084,7 @@ function openCustomQuizModal() {
         setupTimerText = 'No timer (Practice Mode)';
     }
     
-    // Set initial timer display - using the correct element ID
+    // Set initial timer display
     timerDisplaySpan.textContent = setupTimerText;
 
     // Add event listeners to all question count inputs
@@ -937,7 +1113,7 @@ function updateCustomQuizSummary() {
     JAMB_APP.selectedSubjects.forEach(subject => {
         const subjectInfo = JAMB_APP.allSubjects[subject];
         const questionCount = JAMB_APP.questions[subject]?.length || 0;
-        const maxQuestions = Math.min(questionCount, JAMB_APP.MAX_QUESTIONS_PER_SUBJECT);
+        const maxQuestionsForQuiz = Math.min(questionCount, JAMB_APP.MAX_QUESTIONS_PER_QUIZ);
         
         const input = document.querySelector(`.subject-question-count[data-subject="${subject}"]`);
         if (!input) return;
@@ -948,9 +1124,9 @@ function updateCustomQuizSummary() {
         if (requestedQuestions < 1) {
             requestedQuestions = 1;
             input.value = 1;
-        } else if (requestedQuestions > maxQuestions) {
-            requestedQuestions = maxQuestions;
-            input.value = maxQuestions;
+        } else if (requestedQuestions > maxQuestionsForQuiz) {
+            requestedQuestions = maxQuestionsForQuiz;
+            input.value = maxQuestionsForQuiz;
         }
         
         // Check if enough questions available
@@ -987,6 +1163,7 @@ function updateCustomQuizSummary() {
         showAlert('Some subjects don\'t have enough questions available. Adjusted to maximum available.', 'error');
     }
 }
+
 function updateCustomQuizTimerDisplay() {
     const timerDisplaySpan = document.getElementById('custom-timer-display');
     
@@ -1018,6 +1195,7 @@ function startCustomQuiz() {
         
         const requestedQuestions = parseInt(input.value) || 0;
         const availableQuestions = JAMB_APP.questions[subject]?.length || 0;
+        const maxForQuiz = Math.min(availableQuestions, JAMB_APP.MAX_QUESTIONS_PER_QUIZ);
         
         if (requestedQuestions < 1) {
             hasErrors = true;
@@ -1025,9 +1203,9 @@ function startCustomQuiz() {
         } else if (requestedQuestions > availableQuestions) {
             hasErrors = true;
             errorMessages.push(`${JAMB_APP.allSubjects[subject].name}: Only ${availableQuestions} questions available (requested ${requestedQuestions})`);
-        } else if (requestedQuestions > JAMB_APP.MAX_QUESTIONS_PER_SUBJECT) {
+        } else if (requestedQuestions > maxForQuiz) {
             hasErrors = true;
-            errorMessages.push(`${JAMB_APP.allSubjects[subject].name}: Maximum ${JAMB_APP.MAX_QUESTIONS_PER_SUBJECT} questions allowed per subject`);
+            errorMessages.push(`${JAMB_APP.allSubjects[subject].name}: Maximum ${JAMB_APP.MAX_QUESTIONS_PER_QUIZ} questions allowed per subject in a quiz`);
         } else {
             subjectQuestions[subject] = requestedQuestions;
         }
@@ -1087,10 +1265,6 @@ function updateQuizTab() {
             <button class="btn" onclick="startFullJAMBQuiz()" id="start-jamb-btn" disabled>
                 <i class="fas fa-play"></i> Start Full JAMB Simulation
             </button>
-
-            <button>
-                
-            </button>
             <button class="btn btn-secondary" onclick="practiceCustomQuiz()" id="custom-quiz-btn" disabled>
                 <i class="fas fa-sliders-h"></i> Custom Quiz
             </button>
@@ -1108,7 +1282,6 @@ function updateQuizTab() {
             </div>
         `;
         document.getElementById('start-jamb-btn').disabled = true;
-        document.getElementById('practice-btn').disabled = true;
         document.getElementById('custom-quiz-btn').disabled = true;
         return;
     }
@@ -1157,7 +1330,7 @@ function updateQuizTab() {
     } else {
         const perSubject = JAMB_APP.selectedSubjects.map(s => {
             const count = JAMB_APP.questions[s]?.length || 0;
-            return Math.min(count, JAMB_APP.MAX_QUESTIONS_PER_SUBJECT);
+            return Math.min(count, JAMB_APP.MAX_QUESTIONS_PER_QUIZ);
         });
         questionsPerQuiz = perSubject.reduce((a, b) => a + b, 0);
         document.getElementById('selected-questions-count').textContent = 'All available';
@@ -1168,7 +1341,6 @@ function updateQuizTab() {
         'No timer (Practice Mode)';
     document.getElementById('selected-timer').textContent = timerText;
     document.getElementById('start-jamb-btn').disabled = !allSubjectsHaveQuestions;
-    // document.getElementById('practice-btn').disabled = !allSubjectsHaveQuestions;
     document.getElementById('custom-quiz-btn').disabled = !allSubjectsHaveQuestions;
 }
 
@@ -1183,37 +1355,21 @@ function practiceSubject(subject) {
     if (JAMB_APP.settings.questions.mode === 'custom') {
         questionsToUse = Math.min(JAMB_APP.settings.questions.perSubject, questions.length);
     } else {
-        questionsToUse = Math.min(questions.length, JAMB_APP.MAX_QUESTIONS_PER_SUBJECT);
+        // Use all available questions, but max 100 per quiz
+        questionsToUse = Math.min(questions.length, JAMB_APP.MAX_QUESTIONS_PER_QUIZ);
     }
     
     startSubjectQuiz(subject, questionsToUse);
 }
 
-// function practiceSingleSubject() {
-//     if (JAMB_APP.selectedSubjects.length === 0) {
-//         showAlert('Please select at least one subject', 'error');
-//         return;
-//     }
-    
-//     // Get the first selected subject    const subject = JAMB_APP.selectedSubjects[0];
-    
-//     // Check if subject has questions
-//     const questions = JAMB_APP.questions[Subject];
-//     if (!questions || questions.length === 0) {
-//         showAlert(`No questions available for ${JAMB_APP.allSubjects[subject]?.name || subject}`, 'error');
-//         return;
-//     }
-    
-//     practiceSubject(subject);
-// }
-
 function startSubjectQuiz(subject, questionCount, useTimer = JAMB_APP.settings.timer.enabled, minutes = JAMB_APP.settings.timer.minutes) {
     const questions = JAMB_APP.questions[subject];
     if (!questions || questions.length === 0) return;
     
+    // Use up to MAX_QUESTIONS_PER_QUIZ (100) for quiz
     const quizQuestions = [...questions]
         .sort(() => Math.random() - 0.5)
-        .slice(0, Math.min(questionCount, JAMB_APP.MAX_QUESTIONS_PER_SUBJECT));
+        .slice(0, Math.min(questionCount, JAMB_APP.MAX_QUESTIONS_PER_QUIZ));
     
     JAMB_APP.currentQuiz = {
         type: 'subject',
@@ -1260,7 +1416,8 @@ function startJAMBQuiz() {
         if (JAMB_APP.settings.questions.mode === 'custom') {
             count = Math.min(JAMB_APP.settings.questions.perSubject, available);
         } else {
-            count = Math.min(available, JAMB_APP.MAX_QUESTIONS_PER_SUBJECT);
+            // Use all available but max 100 per subject for JAMB quiz
+            count = Math.min(available, JAMB_APP.MAX_QUESTIONS_PER_QUIZ);
         }
         
         const shuffledQuestions = JAMB_APP.questions[subject]
@@ -1341,357 +1498,7 @@ function startCustomQuizWithSettings(subjectQuestions, timerSettings) {
         if (requestedCount > 0 && questions.length > 0) {
             const shuffledQuestions = [...questions]
                 .sort(() => Math.random() - 0.5)
-                .slice(0, Math.min(requestedCount, JAMB_APP.MAX_QUESTIONS_PER_SUBJECT))
-                .map(q => ({ ...q, subject: subject }));
-            
-            const endIndex = startIndex + shuffledQuestions.length - 1;
-            questionRanges[subject] = {
-                start: startIndex,
-                end: endIndex,
-                questions: shuffledQuestions
-            };
-            allQuestions.push(...shuffledQuestions);
-            startIndex = endIndex + 1;
-        }
-    });
-    
-    JAMB_APP.currentQuiz = {
-        type: 'jamb',
-        subjects: orderedSubjects.filter(subject => subjectQuestions[subject] > 0),
-        questions: allQuestions,
-        questionRanges: questionRanges,
-        currentSubject: orderedSubjects[0],
-        currentIndex: 0,
-        score: 0,
-        answers: new Array(allQuestions.length).fill(null),
-        startTime: new Date(),
-        totalTime: timerSettings.enabled ? timerSettings.minutes * 60 : 0,
-        timerUsed: timerSettings.enabled,
-        timerSetting: timerSettings.minutes,
-        results: null
-    };
-    
-    showQuizInterface();
-}
-
-// ================ QUIZ INTERFACE FUNCTIONS ================
-function showQuizInterface() {
-    const quiz = JAMB_APP.currentQuiz;
-    if (!quiz) return;
-    
-    // Calculate global question number
-    const globalQuestionNumber = quiz.currentIndex + 1;
-    const currentSubject = quiz.questions[quiz.currentIndex]?.subject || quiz.currentSubject;
-    const subjectStart = quiz.questionRanges?.[currentSubject]?.start || 1;
-    const subjectQuestionNumber = (quiz.currentIndex - getSubjectStartIndex(quiz, currentSubject)) + 1;
-    const subjectTotalQuestions = quiz.questionRanges?.[currentSubject]?.questions.length || 0;
-    
-    let html = '';
-    
-    // Add exam mode header if in exam mode
-    if (examMode && quiz.type === 'jamb') {
-        html += `
-            <div style="background: #6200ea; color: white; padding: 15px; text-align: center;">
-                <h2 style="margin: 0;">
-                    <i class="fas fa-graduation-cap"></i> JAMB SIMULATION EXAM
-                </h2>
-                <p style="margin: 5px 0 0 0; font-size: 14px;">
-                    Do not close or refresh this page. Use "End Exam" button to finish.
-                </p>
-            </div>
-        `;
-    }
-    
-    // Create timer display if timer is enabled
-    if (quiz.timerUsed && quiz.totalTime > 0) {
-        html += `
-            <div style="background: ${examMode ? '#3700b3' : '#6200ea'}; color: white; padding: 15px; border-radius: ${examMode ? '0' : '10px'}; margin-bottom: 20px; text-align: center;">
-                <div id="timer-display" class="timer-display">
-                    <i class="fas fa-clock"></i> Loading...
-                </div>
-            </div>
-        `;
-    }
-    
-    if (quiz.type === 'jamb') {
-        // JAMB quiz interface
-        html += `
-            <div style="background: #f5f5f5; padding: 15px; border-radius: 10px; margin-bottom: 20px;">
-                <div style="display: flex; justify-content: space-between; align-items: center;">
-                    <div>
-                        <h3>🎯 JAMB Simulation</h3>
-                        <p>Question ${globalQuestionNumber} of ${quiz.questions.length}</p>
-                    </div>
-                    <div style="display: flex; gap: 20px; align-items: center;">
-                        <div>
-                            <div style="font-size: 12px; color: #666;">Answered</div>
-                            <div style="font-size: 20px; font-weight: bold;">${quiz.answers.filter(a => a !== null).length}</div>
-                        </div>
-                        <button class="btn" onclick="endQuiz()" style="background: #f44336;">
-                            <i class="fas fa-stop"></i> End Quiz
-                        </button>
-                    </div>
-                </div>
-            </div>
-        `;
-        
-        // Subject tabs with question ranges
-        html += `
-            <div class="quiz-subject-selector" style="margin-bottom: 20px;">
-                ${quiz.subjects.map(subject => {
-                    const subjectInfo = JAMB_APP.allSubjects[subject];
-                    const range = quiz.questionRanges?.[subject];
-                    if (!range) return '';
-                    
-                    const answeredCount = range.questions.filter((q, idx) => {
-                        const globalIdx = getSubjectStartIndex(quiz, subject) + idx;
-                        return quiz.answers[globalIdx] !== null;
-                    }).length;
-                    
-                    const isCurrentSubject = currentSubject === subject;
-                    const rangeText = `Q${range.start}-${range.end}`;
-                    
-                    return `
-                        <div class="quiz-subject-tab ${isCurrentSubject ? 'active' : ''}" 
-                             onclick="switchToSubject('${subject}')">
-                            <div>${subjectInfo.name}</div>
-                            <div style="font-size: 11px; margin-top: 2px; color: ${isCurrentSubject ? 'white' : '#666'}">
-                                ${rangeText} • ${answeredCount}/${range.questions.length}
-                            </div>
-                        </div>
-                    `;
-                }).join('')}
-            </div>
-        `;
-    } else {
-        // Single subject quiz interface
-        const subjectInfo = JAMB_APP.allSubjects[quiz.subject];
-        const subjectName = subjectInfo?.name || quiz.subject || "Unknown Subject";
-        const subjectIcon = subjectInfo?.icon || "book";
-        
-        html += `
-            <div style="background: #f5f5f5; padding: 15px; border-radius: 10px; margin-bottom: 20px;">
-                <div style="display: flex; justify-content: space-between; align-items: center;">
-                    <div>
-                        <h3>📚 ${subjectName} Practice</h3>
-                        <p>Question ${quiz.currentIndex + 1} of ${quiz.questions.length}</p>
-                    </div>
-                    <div style="display: flex; gap: 20px; align-items: center;">
-                        <div>
-                            <div style="font-size: 12px; color: #666;">Answered</div>
-                            <div style="font-size: 20px; font-weight: bold;">${quiz.answers.filter(a => a !== null).length}</div>
-                        </div>
-                        <button class="btn" onclick="endQuiz()" style="background: #f44336;">
-                            <i class="fas fa-stop"></i> End Quiz
-                        </button>
-                    </div>
-                </div>
-            </div>
-        `;
-    }
-    
-    // Add progress bar
-    const answeredCount = quiz.answers.filter(answer => answer !== null).length;
-    const progress = ((answeredCount + 1) / quiz.questions.length) * 100;
-    html += `
-        <div class="progress-container">
-            <div class="progress-bar">
-                <div class="progress-fill" style="width: ${progress}%"></div>
-            </div>
-            <div style="text-align: center; margin-top: 5px; color: #666;">
-                ${answeredCount}/${quiz.questions.length} answered • ${Math.round(progress)}% Complete
-            </div>
-        </div>
-    `;
-    
-    // Add current question
-    const currentQuestion = quiz.questions[quiz.currentIndex];
-    const userAnswer = quiz.answers[quiz.currentIndex];
-    
-    html += `
-        <div class="question-box">
-    `;
-    
-    if (quiz.type === 'jamb') {
-        const subjectInfo = JAMB_APP.allSubjects[currentSubject];
-        html += `
-            <div style="margin-bottom: 15px; display: flex; justify-content: space-between; align-items: center;">
-                <span class="selected-subject-tag">
-                    <i class="fas fa-${subjectInfo?.icon || 'book'}"></i>
-                    ${subjectInfo?.name || currentSubject}
-                    • Question ${subjectQuestionNumber} of ${subjectTotalQuestions}
-                </span>
-                <span style="font-size: 14px; color: #666;">
-                    (Question ${globalQuestionNumber} of ${quiz.questions.length})
-                </span>
-            </div>
-        `;
-    }
-    
-    html += `
-            <div class="question-text">${currentQuestion.question}</div>
-            
-            <div class="options-grid">
-    `;
-    
-    // Show options
-    currentQuestion.options.forEach((option, index) => {
-        let buttonClass = 'option-btn';
-        
-        if (userAnswer !== null && index === userAnswer) {
-            buttonClass += ' selected';
-        }
-        
-        html += `
-            <button class="${buttonClass}" onclick="selectAnswer(${index})">
-                <span class="option-letter">${String.fromCharCode(65 + index)}</span>
-                <span>${option}</span>
-                ${userAnswer !== null && index === userAnswer ? 
-                    '<span style="margin-left: auto; color: #6200ea;"><i class="fas fa-check"></i> Selected</span>' : 
-                    ''}
-            </button>
-        `;
-    });
-    
-    html += `
-            </div>
-        </div>
-        
-        <div style="margin: 30px 0; text-align: center;">
-            <div style="display: flex; justify-content: center; flex-wrap: wrap; gap: 8px; margin-bottom: 15px;">
-    `;
-    
-    if (quiz.type === 'jamb') {
-        // Add question navigation numbers - GROUPED BY SUBJECT
-        quiz.subjects.forEach(subject => {
-            const range = quiz.questionRanges?.[subject];
-            if (!range) return;
-            
-            html += `<div style="margin: 10px 0; width: 100%;">`;
-            html += `<div style="text-align: left; margin-bottom: 5px; font-size: 14px; color: #666;">
-                        <i class="fas fa-${JAMB_APP.allSubjects[subject]?.icon || 'book'}"></i> ${JAMB_APP.allSubjects[subject]?.name || subject}
-                        (Questions ${range.start}-${range.end})
-                     </div>`;
-            html += `<div style="display: flex; flex-wrap: wrap; gap: 5px; justify-content: flex-start;">`;
-            
-            for (let i = range.start; i <= range.end; i++) {
-                const questionIndex = i - 1;
-                const isCurrent = questionIndex === quiz.currentIndex;
-                const isAnswered = quiz.answers[questionIndex] !== null;
-                const buttonClass = isCurrent ? 'question-nav-btn current' : 
-                                   isAnswered ? 'question-nav-btn answered' : 
-                                   'question-nav-btn';
-                
-                html += `
-                    <button class="${buttonClass}" onclick="jumpToQuestion(${questionIndex})">
-                        ${i}
-                    </button>
-                `;
-            }
-            
-            html += `</div></div>`;
-        });
-    } else {
-        // Single subject question navigation
-        for (let i = 0; i < quiz.questions.length; i++) {
-            const isCurrent = i === quiz.currentIndex;
-            const isAnswered = quiz.answers[i] !== null;
-            const buttonClass = isCurrent ? 'question-nav-btn current' : 
-                               isAnswered ? 'question-nav-btn answered' : 
-                               'question-nav-btn';
-            
-            html += `
-                <button class="${buttonClass}" onclick="jumpToQuestion(${i})">
-                    ${i + 1}
-                </button>
-            `;
-        }
-    }
-    
-    html += `
-            </div>
-            <div style="font-size: 12px; color: #666;">
-                <span style="display: inline-flex; align-items: center; margin: 0 10px;">
-                    <span style="display: inline-block; width: 12px; height: 12px; background: #6200ea; border-radius: 50%; margin-right: 5px;"></span> Current
-                </span>
-                <span style="display: inline-flex; align-items: center; margin: 0 10px;">
-                    <span style="display: inline-block; width: 12px; height: 12px; background: #4caf50; border-radius: 50%; margin-right: 5px;"></span> Answered
-                </span>
-                <span style="display: inline-flex; align-items: center; margin: 0 10px;">
-                    <span style="display: inline-block; width: 12px; height: 12px; background: #f5f5f5; border-radius: 50%; border: 1px solid #ddd; margin-right: 5px;"></span> Unanswered
-                </span>
-            </div>
-        </div>
-        
-        <div class="quiz-navigation">
-            <div>
-                <button class="btn btn-secondary" onclick="previousQuestion()" ${quiz.currentIndex === 0 ? 'disabled' : ''}>
-                    <i class="fas fa-arrow-left"></i> Previous Question
-                </button>
-                <button class="btn btn-secondary" onclick="markForReview()" style="margin-left: 10px; background: #ff9800;">
-                    <i class="fas fa-flag"></i> ${quiz.review && quiz.review.includes(quiz.currentIndex) ? 'Unmark' : 'Mark'} for Review
-                </button>
-            </div>
-            
-            <div>
-                <div style="display: flex; gap: 10px;">
-                    <div style="position: relative;">
-                        <button class="btn btn-secondary" onclick="toggleJumpMenu()">
-                            <i class="fas fa-jump"></i> Jump to Question
-                        </button>
-                        <div class="jump-menu" id="jump-menu" style="display: none; position: absolute; top: 100%; left: 0; background: white; border: 1px solid #ddd; border-radius: 5px; padding: 10px; z-index: 100; min-width: 150px; box-shadow: 0 5px 15px rgba(0,0,0,0.1);">
-                            <div style="margin-bottom: 5px; font-weight: 500;">Go to question:</div>
-                            <div style="display: flex; align-items: center;">
-                                <input type="number" id="jump-to-number" min="1" max="${quiz.questions.length}" value="${quiz.currentIndex + 1}" style="width: 60px; padding: 5px; border: 1px solid #ddd; border-radius: 3px;">
-                                <button class="btn" onclick="jumpToQuestionNumber()" style="padding: 5px 10px; margin-left: 5px; font-size: 12px;">Go</button>
-                            </div>
-                        </div>
-                    </div>
-                    
-                    <button class="btn" onclick="nextQuestion()">
-                        ${quiz.currentIndex === quiz.questions.length - 1 ? 'Finish Quiz' : 'Next Question'} 
-                        <i class="fas fa-arrow-right"></i>
-                    </button>
-                </div>
-            </div>
-        </div>
-    `;
-    
-    document.getElementById('quizContainer').innerHTML = html;
-    
-    // Start timer if enabled
-    if (quiz.timerUsed && quiz.totalTime > 0) {
-        startQuizTimer(quiz.totalTime);
-    }
-    
-    switchTab('quiz');
-}
-
-function startCustomQuizWithSettings(subjectQuestions, timerSettings) {
-    let questionRanges = {};
-    let allQuestions = [];
-    
-    // Arrange in order: English first (if selected), then others
-    const orderedSubjects = [];
-    if (JAMB_APP.selectedSubjects.includes('english')) {
-        orderedSubjects.push('english');
-    }
-    JAMB_APP.selectedSubjects.forEach(subject => {
-        if (subject !== 'english') {
-            orderedSubjects.push(subject);
-        }
-    });
-    
-    // Calculate question ranges for each subject
-    let startIndex = 1;
-    orderedSubjects.forEach(subject => {
-        const requestedCount = subjectQuestions[subject] || 0;
-        const questions = JAMB_APP.questions[subject] || [];
-        
-        if (requestedCount > 0 && questions.length > 0) {
-            const shuffledQuestions = [...questions]
-                .sort(() => Math.random() - 0.5)
-                .slice(0, Math.min(requestedCount, JAMB_APP.MAX_QUESTIONS_PER_SUBJECT))
+                .slice(0, Math.min(requestedCount, JAMB_APP.MAX_QUESTIONS_PER_QUIZ))
                 .map(q => ({ ...q, subject: subject }));
             
             const endIndex = startIndex + shuffledQuestions.length - 1;
@@ -1727,6 +1534,476 @@ function startCustomQuizWithSettings(subjectQuestions, timerSettings) {
     }
     
     showQuizInterface();
+}
+
+// ================ QUIZ INTERFACE FUNCTIONS ================
+function showQuizInterface() {
+    const quiz = JAMB_APP.currentQuiz;
+    if (!quiz) return;
+    
+    // Calculate global question number
+    const globalQuestionNumber = quiz.currentIndex + 1;
+    const currentSubject = quiz.questions[quiz.currentIndex]?.subject || quiz.currentSubject;
+    const subjectStart = quiz.questionRanges?.[currentSubject]?.start || 1;
+    const subjectQuestionNumber = (quiz.currentIndex - getSubjectStartIndex(quiz, currentSubject)) + 1;
+    const subjectTotalQuestions = quiz.questionRanges?.[currentSubject]?.questions.length || 0;
+    
+    // Calculate progress
+    const answeredCount = quiz.answers.filter(answer => answer !== null).length;
+    const progress = ((answeredCount) / quiz.questions.length) * 100;
+    
+    let html = '';
+    
+    // Add exam mode header if in exam mode
+    if (examMode && quiz.type === 'jamb') {
+        html += `
+            <div style="background: linear-gradient(to right, #3700b3, #6200ea); color: white; padding: 15px; text-align: center; border-bottom: 3px solid #ff9800;">
+                <h2 style="margin: 0;">
+                    <i class="fas fa-graduation-cap"></i> JAMB SIMULATION EXAM
+                </h2>
+                <p style="margin: 5px 0 0 0; font-size: 14px;">
+                    <i class="fas fa-exclamation-triangle"></i> Do not close or refresh this page
+                </p>
+            </div>
+        `;
+    }
+    
+    // Create timer display if timer is enabled
+    if (quiz.timerUsed && quiz.totalTime > 0) {
+        html += `
+            <div style="background: ${examMode ? '#3700b3' : '#6200ea'}; color: white; padding: 12px; border-radius: ${examMode ? '0' : '10px'}; margin: 10px 0; text-align: center;">
+                <div id="timer-display" class="timer-display">
+                    <i class="fas fa-clock"></i> Loading...
+                </div>
+            </div>
+        `;
+    }
+    
+    // ================ TOP CONTROLS BAR ================
+    html += `
+        <div class="quiz-top-controls" style="display: flex; justify-content: space-between; align-items: center; margin: 15px 0; padding: 15px; background: #f8f9fa; border-radius: 12px; border: 2px solid #e0e0e0;">
+            <!-- Left: End Quiz Button -->
+            <div>
+                <button class="btn" onclick="endQuiz()" style="background: #f44336; padding: 10px 20px;">
+                    <i class="fas fa-stop"></i> End Quiz
+                </button>
+            </div>
+            
+            <!-- Center: Jump to Question -->
+            <div class="jump-menu-wrapper" style="position: relative;">
+                <button class="btn" onclick="toggleJumpMenu()" style="background: #2196f3; padding: 10px 20px;">
+                    <i class="fas fa-forward"></i> Jump to Question
+                </button>
+                <div class="jump-menu" id="jump-menu" style="display: none; position: absolute; top: 100%; right: 0; background: white; border: 2px solid #6200ea; border-radius: 10px; padding: 15px; z-index: 1000; box-shadow: 0 5px 15px rgba(0,0,0,0.2); min-width: 250px;">
+                    <div style="margin-bottom: 10px; font-weight: 500; color: #6200ea; font-size: 16px;">
+                        <i class="fas fa-arrow-right"></i> Go to Question
+                    </div>
+                    <div style="display: flex; gap: 10px; align-items: center; margin-bottom: 10px;">
+                        <input type="number" id="jump-to-number" 
+                               min="1" max="${quiz.questions.length}" 
+                               value="${quiz.currentIndex + 1}" 
+                               style="flex: 1; padding: 12px; border: 2px solid #ddd; border-radius: 8px; font-size: 16px; text-align: center;">
+                        <button class="btn" onclick="jumpToQuestionNumber()" style="padding: 12px 20px;">
+                            <i class="fas fa-check"></i> Go
+                        </button>
+                    </div>
+                    <div style="font-size: 12px; color: #666; text-align: center;">
+                        Enter number (1-${quiz.questions.length})
+                    </div>
+                </div>
+            </div>
+            
+            <!-- Right: Stats -->
+            <div style="display: flex; align-items: center; gap: 20px;">
+                <div style="text-align: center;">
+                    <div style="font-size: 12px; color: #666; margin-bottom: 5px;">Answered</div>
+                    <div style="font-size: 24px; font-weight: bold; color: #4caf50;">
+                        ${answeredCount}
+                    </div>
+                </div>
+                <div style="text-align: center;">
+                    <div style="font-size: 12px; color: #666; margin-bottom: 5px;">Remaining</div>
+                    <div style="font-size: 24px; font-weight: bold; color: #ff9800;">
+                        ${quiz.questions.length - answeredCount}
+                    </div>
+                </div>
+                <div style="text-align: center;">
+                    <div style="font-size: 12px; color: #666; margin-bottom: 5px;">Total</div>
+                    <div style="font-size: 24px; font-weight: bold; color: #6200ea;">
+                        ${quiz.questions.length}
+                    </div>
+                </div>
+            </div>
+        </div>
+    `;
+    
+    // ================ PROGRESS BAR ================
+    html += `
+        <div class="progress-container" style="margin: 10px 0 20px 0;">
+            <div class="progress-bar">
+                <div class="progress-fill" style="width: ${progress}%"></div>
+            </div>
+            <div style="text-align: center; margin-top: 5px; color: #666; font-size: 14px; display: flex; justify-content: space-between;">
+                <span>${Math.round(progress)}% Complete</span>
+                <span>Question ${globalQuestionNumber} of ${quiz.questions.length}</span>
+                <span>${answeredCount} answered</span>
+            </div>
+        </div>
+    `;
+    
+    // ================ SUBJECT SELECTOR (for JAMB quiz) ================
+    if (quiz.type === 'jamb') {
+        html += `
+            <div class="quiz-subject-selector" style="margin-bottom: 20px; overflow-x: auto; white-space: nowrap; padding-bottom: 10px; -webkit-overflow-scrolling: touch;">
+                ${quiz.subjects.map(subject => {
+                    const subjectInfo = JAMB_APP.allSubjects[subject];
+                    const range = quiz.questionRanges?.[subject];
+                    if (!range) return '';
+                    
+                    const answeredInSubject = range.questions.filter((q, idx) => {
+                        const globalIdx = getSubjectStartIndex(quiz, subject) + idx;
+                        return quiz.answers[globalIdx] !== null;
+                    }).length;
+                    
+                    const isCurrentSubject = currentSubject === subject;
+                    const rangeText = `Q${range.start}-${range.end}`;
+                    
+                    return `
+                        <div class="quiz-subject-tab ${isCurrentSubject ? 'active' : ''}" 
+                             onclick="switchToSubject('${subject}')"
+                             style="display: inline-block; padding: 10px 20px; margin: 0 5px; background: ${isCurrentSubject ? '#6200ea' : '#f5f5f5'}; color: ${isCurrentSubject ? 'white' : '#333'}; border-radius: 20px; border: 2px solid ${isCurrentSubject ? '#6200ea' : '#ddd'}; cursor: pointer; font-weight: 500; min-width: 140px; text-align: center;">
+                            <div style="font-size: 14px; display: flex; align-items: center; justify-content: center; gap: 8px;">
+                                <i class="fas fa-${subjectInfo?.icon || 'book'}"></i>
+                                ${subjectInfo.name}
+                            </div>
+                            <div style="font-size: 11px; margin-top: 5px; color: ${isCurrentSubject ? 'rgba(255,255,255,0.8)' : '#666'}">
+                                ${rangeText} • ${answeredInSubject}/${range.questions.length}
+                            </div>
+                        </div>
+                    `;
+                }).join('')}
+            </div>
+        `;
+    }
+    
+    // ================ QUESTION BOX ================
+    const currentQuestion = quiz.questions[quiz.currentIndex];
+    const userAnswer = quiz.answers[quiz.currentIndex];
+    
+    html += `
+        <div class="question-box" style="background: white; padding: 25px; border-radius: 12px; box-shadow: 0 3px 10px rgba(0,0,0,0.08); margin-bottom: 20px; border: 1px solid #e0e0e0;">
+    `;
+    
+    // Subject indicator for JAMB quiz
+    if (quiz.type === 'jamb') {
+        const subjectInfo = JAMB_APP.allSubjects[currentSubject];
+        html += `
+            <div style="margin-bottom: 20px; display: flex; justify-content: space-between; align-items: center; padding: 12px; background: #e8eaf6; border-radius: 8px;">
+                <span style="display: flex; align-items: center; gap: 10px; font-weight: 500; color: #6200ea;">
+                    <i class="fas fa-${subjectInfo?.icon || 'book'}"></i>
+                    ${subjectInfo?.name || currentSubject}
+                </span>
+                <span style="font-size: 14px; color: #666; background: white; padding: 5px 12px; border-radius: 15px; border: 1px solid #ddd;">
+                    Question ${subjectQuestionNumber} of ${subjectTotalQuestions} in this subject
+                </span>
+            </div>
+        `;
+    }
+    
+    // Question text
+    html += `
+            <div class="question-text" style="font-size: 20px; line-height: 1.6; margin-bottom: 25px; color: #333;">
+                <strong>${globalQuestionNumber}.</strong> ${currentQuestion.question}
+            </div>
+            
+            <div class="options-grid" style="display: grid; gap: 15px;">
+    `;
+    
+    // Options
+    currentQuestion.options.forEach((option, index) => {
+        let buttonClass = 'option-btn';
+        let selectedText = '';
+        
+        if (userAnswer !== null && index === userAnswer) {
+            buttonClass += ' selected';
+            selectedText = '<span style="margin-left: auto; color: #6200ea;"><i class="fas fa-check-circle"></i> Selected</span>';
+        }
+        
+        html += `
+                <button class="${buttonClass}" onclick="selectAnswer(${index})" style="padding: 15px; border: 2px solid #e0e0e0; border-radius: 8px; background: white; text-align: left; cursor: pointer; font-size: 16px; display: flex; align-items: center; transition: all 0.2s;">
+                    <span class="option-letter" style="display: inline-flex; align-items: center; justify-content: center; width: 36px; height: 36px; background: #6200ea; color: white; border-radius: 50%; margin-right: 15px; font-weight: bold; font-size: 16px;">
+                        ${String.fromCharCode(65 + index)}
+                    </span>
+                    <span style="flex: 1; text-align: left;">${option}</span>
+                    ${selectedText}
+                </button>
+        `;
+    });
+    
+    html += `
+            </div>
+        </div>
+    `;
+    
+    // ================ QUESTION NAVIGATION NUMBERS ================
+    html += `
+        <div style="margin: 25px 0;">
+            <div style="margin-bottom: 15px; font-weight: 500; color: #6200ea; display: flex; align-items: center; gap: 10px;">
+                <i class="fas fa-list-ol"></i>
+                Question Navigation
+                <span style="font-size: 14px; color: #666; font-weight: normal; margin-left: auto;">
+                    Click any number to jump
+                </span>
+            </div>
+    `;
+    
+    if (quiz.type === 'jamb') {
+        // Grouped by subject for JAMB quiz
+        quiz.subjects.forEach(subject => {
+            const range = quiz.questionRanges?.[subject];
+            if (!range) return;
+            
+            const subjectInfo = JAMB_APP.allSubjects[subject];
+            
+            html += `
+                <div style="margin: 15px 0;">
+                    <div style="margin-bottom: 10px; font-size: 14px; color: #666; display: flex; align-items: center; gap: 8px; padding: 8px 12px; background: #f8f9fa; border-radius: 8px;">
+                        <i class="fas fa-${subjectInfo?.icon || 'book'}"></i>
+                        <strong>${subjectInfo?.name || subject}</strong>
+                        <span style="margin-left: auto; font-size: 12px; color: #999;">
+                            Questions ${range.start}-${range.end}
+                        </span>
+                    </div>
+                    <div style="display: flex; flex-wrap: wrap; gap: 8px;">
+            `;
+            
+            for (let i = range.start; i <= range.end; i++) {
+                const questionIndex = i - 1;
+                const isCurrent = questionIndex === quiz.currentIndex;
+                const isAnswered = quiz.answers[questionIndex] !== null;
+                const buttonClass = isCurrent ? 'question-nav-btn current' : 
+                                   isAnswered ? 'question-nav-btn answered' : 
+                                   'question-nav-btn';
+                
+                html += `
+                    <button class="${buttonClass}" onclick="jumpToQuestion(${questionIndex})" 
+                            style="width: 40px; height: 40px; border-radius: 50%; border: 2px solid #ddd; background: white; display: flex; align-items: center; justify-content: center; cursor: pointer; font-weight: 500; font-size: 14px; transition: all 0.2s;">
+                        ${i}
+                    </button>
+                `;
+            }
+            
+            html += `
+                    </div>
+                </div>
+            `;
+        });
+    } else {
+        // Single subject navigation
+        html += `<div style="display: flex; flex-wrap: wrap; gap: 8px; justify-content: center;">`;
+        
+        for (let i = 0; i < quiz.questions.length; i++) {
+            const isCurrent = i === quiz.currentIndex;
+            const isAnswered = quiz.answers[i] !== null;
+            const buttonClass = isCurrent ? 'question-nav-btn current' : 
+                               isAnswered ? 'question-nav-btn answered' : 
+                               'question-nav-btn';
+            
+            html += `
+                <button class="${buttonClass}" onclick="jumpToQuestion(${i})" 
+                        style="width: 40px; height: 40px; border-radius: 50%; border: 2px solid #ddd; background: white; display: flex; align-items: center; justify-content: center; cursor: pointer; font-weight: 500; font-size: 14px; transition: all 0.2s;">
+                    ${i + 1}
+                </button>
+            `;
+        }
+        
+        html += `</div>`;
+    }
+    
+    html += `
+            <div style="margin-top: 15px; font-size: 12px; color: #666; display: flex; justify-content: center; flex-wrap: wrap; gap: 15px;">
+                <span style="display: inline-flex; align-items: center;">
+                    <span style="display: inline-block; width: 12px; height: 12px; background: #6200ea; border-radius: 50%; margin-right: 5px;"></span> Current
+                </span>
+                <span style="display: inline-flex; align-items: center;">
+                    <span style="display: inline-block; width: 12px; height: 12px; background: #4caf50; border-radius: 50%; margin-right: 5px;"></span> Answered
+                </span>
+                <span style="display: inline-flex; align-items: center;">
+                    <span style="display: inline-block; width: 12px; height: 12px; background: #f5f5f5; border-radius: 50%; border: 1px solid #ddd; margin-right: 5px;"></span> Unanswered
+                </span>
+            </div>
+        </div>
+    `;
+    
+    // ================ BOTTOM NAVIGATION ================
+    html += `
+        <div class="quiz-bottom-nav" style="display: flex; justify-content: space-between; margin-top: 30px; padding-top: 20px; border-top: 2px solid #f0f0f0;">
+            <button class="btn btn-secondary" onclick="previousQuestion()" ${quiz.currentIndex === 0 ? 'disabled' : ''} 
+                    style="padding: 12px 25px; background: #666; color: white; border: none; border-radius: 8px; cursor: pointer; font-weight: 500; display: flex; align-items: center; gap: 8px;">
+                <i class="fas fa-arrow-left"></i> Previous
+            </button>
+            
+            <button class="btn" onclick="markForReview()" 
+                    style="background: #ff9800; padding: 12px 25px; color: white; border: none; border-radius: 8px; cursor: pointer; font-weight: 500; display: flex; align-items: center; gap: 8px;">
+                <i class="fas fa-flag"></i> ${quiz.review && quiz.review.includes(quiz.currentIndex) ? 'Unmark Review' : 'Mark for Review'}
+            </button>
+            
+            <button class="btn" onclick="nextQuestion()" 
+                    style="background: #6200ea; padding: 12px 25px; color: white; border: none; border-radius: 8px; cursor: pointer; font-weight: 500; display: flex; align-items: center; gap: 8px;">
+                ${quiz.currentIndex === quiz.questions.length - 1 ? 'Finish Quiz' : 'Next'} 
+                <i class="fas fa-arrow-right"></i>
+            </button>
+        </div>
+    `;
+    
+    // Set the HTML
+    document.getElementById('quizContainer').innerHTML = html;
+    
+    // Start timer if enabled
+    if (quiz.timerUsed && quiz.totalTime > 0) {
+        startQuizTimer(quiz.totalTime);
+    }
+    
+    // Add CSS for button states
+    addQuizButtonStyles();
+    
+    switchTab('quiz');
+}
+
+// Helper function to add dynamic styles for quiz buttons
+function addQuizButtonStyles() {
+    const styleId = 'quiz-button-styles';
+    if (document.getElementById(styleId)) return;
+    
+    const style = document.createElement('style');
+    style.id = styleId;
+    style.textContent = `
+        .option-btn:hover {
+            border-color: #6200ea !important;
+            background: #f3e5f5 !important;
+            transform: translateY(-2px) !important;
+            box-shadow: 0 3px 8px rgba(98,0,234,0.2) !important;
+        }
+        
+        .option-btn.selected {
+            background: #e8eaf6 !important;
+            border-color: #6200ea !important;
+        }
+        
+        .option-btn.selected .option-letter {
+            background: #6200ea !important;
+        }
+        
+        .question-nav-btn:hover {
+            transform: scale(1.1) !important;
+            border-color: #6200ea !important;
+        }
+        
+        .question-nav-btn.current {
+            background: #6200ea !important;
+            color: white !important;
+            border-color: #6200ea !important;
+            font-weight: bold !important;
+        }
+        
+        .question-nav-btn.answered {
+            background: #4caf50 !important;
+            color: white !important;
+            border-color: #4caf50 !important;
+        }
+        
+        .quiz-subject-tab:hover {
+            transform: translateY(-2px) !important;
+            box-shadow: 0 3px 8px rgba(0,0,0,0.1) !important;
+        }
+        
+        .quiz-subject-tab.active {
+            background: #6200ea !important;
+            color: white !important;
+            border-color: #6200ea !important;
+        }
+        
+        button:disabled {
+            opacity: 0.5 !important;
+            cursor: not-allowed !important;
+        }
+        
+        button:disabled:hover {
+            transform: none !important;
+            box-shadow: none !important;
+        }
+        
+        @media (max-width: 768px) {
+            .quiz-top-controls {
+                flex-direction: column !important;
+                gap: 15px !important;
+            }
+            
+            .quiz-top-controls > div {
+                width: 100% !important;
+                justify-content: center !important;
+                display: flex !important;
+            }
+            
+            .quiz-bottom-nav {
+                flex-direction: column !important;
+                gap: 12px !important;
+                position: sticky !important;
+                bottom: 0 !important;
+                background: white !important;
+                padding: 15px !important;
+                margin-top: 20px !important;
+                border-top: 3px solid #6200ea !important;
+                box-shadow: 0 -5px 15px rgba(0,0,0,0.1) !important;
+            }
+            
+            .quiz-bottom-nav button {
+                width: 100% !important;
+                padding: 15px !important;
+                font-size: 16px !important;
+            }
+            
+            .question-nav-btn {
+                width: 35px !important;
+                height: 35px !important;
+                font-size: 13px !important;
+            }
+            
+            .option-btn {
+                padding: 12px !important;
+                font-size: 15px !important;
+            }
+            
+            .option-letter {
+                width: 32px !important;
+                height: 32px !important;
+                font-size: 14px !important;
+            }
+        }
+        
+        @media (max-width: 480px) {
+            .quiz-top-controls {
+                padding: 12px !important;
+                gap: 12px !important;
+            }
+            
+            .quiz-bottom-nav {
+                padding: 12px !important;
+            }
+            
+            .question-nav-btn {
+                width: 32px !important;
+                height: 32px !important;
+                font-size: 12px !important;
+            }
+            
+            .question-text {
+                font-size: 18px !important;
+            }
+        }
+    `;
+    
+    document.head.appendChild(style);
 }
 
 // Helper function to get starting index of a subject
@@ -1779,8 +2056,57 @@ function jumpToQuestion(index) {
 // NEW FUNCTION: Toggle jump menu
 function toggleJumpMenu() {
     const jumpMenu = document.getElementById('jump-menu');
-    if (jumpMenu) {
-        jumpMenu.style.display = jumpMenu.style.display === 'none' ? 'block' : 'none';
+    if (!jumpMenu) return;
+    
+    const isMobile = window.innerWidth <= 768;
+    
+    if (jumpMenu.style.display === 'none' || jumpMenu.style.display === '') {
+        jumpMenu.style.display = 'block';
+        
+        if (isMobile) {
+            // On mobile, show as centered modal
+            jumpMenu.style.position = 'fixed';
+            jumpMenu.style.top = '50%';
+            jumpMenu.style.left = '50%';
+            jumpMenu.style.transform = 'translate(-50%, -50%)';
+            jumpMenu.style.width = '90%';
+            jumpMenu.style.maxWidth = '300px';
+            
+            // Add overlay
+            const overlay = document.createElement('div');
+            overlay.className = 'jump-menu-overlay';
+            overlay.style.cssText = `
+                position: fixed;
+                top: 0;
+                left: 0;
+                width: 100%;
+                height: 100%;
+                background: rgba(0,0,0,0.5);
+                z-index: 999;
+            `;
+            overlay.onclick = function() {
+                jumpMenu.style.display = 'none';
+                document.body.removeChild(overlay);
+            };
+            document.body.appendChild(overlay);
+            
+            // Focus on input
+            setTimeout(() => {
+                const input = document.getElementById('jump-to-number');
+                if (input) {
+                    input.focus();
+                    input.setAttribute('inputmode', 'numeric');
+                }
+            }, 100);
+        }
+    } else {
+        jumpMenu.style.display = 'none';
+        
+        // Remove overlay if exists
+        const overlay = document.querySelector('.jump-menu-overlay');
+        if (overlay) {
+            document.body.removeChild(overlay);
+        }
     }
 }
 
@@ -1795,15 +2121,24 @@ function jumpToQuestionNumber() {
     const questionNumber = parseInt(input.value);
     if (questionNumber >= 1 && questionNumber <= quiz.questions.length) {
         jumpToQuestion(questionNumber - 1);
+        
         // Close jump menu
         const jumpMenu = document.getElementById('jump-menu');
         if (jumpMenu) {
             jumpMenu.style.display = 'none';
         }
+        
+        // Remove overlay if exists
+        const overlay = document.querySelector('.jump-menu-overlay');
+        if (overlay) {
+            document.body.removeChild(overlay);
+        }
+    } else {
+        showAlert(`Please enter a number between 1 and ${quiz.questions.length}`, 'error');
     }
 }
 
-// NEW FUNCTION: Update selectAnswer to allow changing answers
+// Update selectAnswer to allow changing answers
 function selectAnswer(answerIndex) {
     const quiz = JAMB_APP.currentQuiz;
     const current = quiz.currentIndex;
@@ -2264,6 +2599,7 @@ function updateResultsTab() {
     // Update performance analytics
     updatePerformanceAnalytics();
 }
+
 function viewResultDetails(resultId) {
     const result = JAMB_APP.results.find(r => r.id === Number(resultId));
     if (!result) return;
@@ -2643,6 +2979,49 @@ function renderCharts(stats) {
     }
 }
 
+function cleanupCharts() {
+    if (window.overallChart && typeof window.overallChart.destroy === 'function') {
+        window.overallChart.destroy();
+        window.overallChart = null;
+    }
+    if (window.subjectChart && typeof window.subjectChart.destroy === 'function') {
+        window.subjectChart.destroy();
+        window.subjectChart = null;
+    }
+    if (window.radarChart && typeof window.radarChart.destroy === 'function') {
+        window.radarChart.destroy();
+        window.radarChart = null;
+    }
+}
+
+// Call cleanup when page is unloaded
+window.addEventListener('beforeunload', cleanupCharts);
+
+// Mobile touch support for question navigation
+function setupMobileTouchSupport() {
+    let touchStartY = 0;
+    let touchEndY = 0;
+    
+    document.addEventListener('touchstart', function(e) {
+        touchStartY = e.changedTouches[0].screenY;
+    });
+    
+    document.addEventListener('touchend', function(e) {
+        touchEndY = e.changedTouches[0].screenY;
+        handleSwipe();
+    });
+    
+    function handleSwipe() {
+        const swipeThreshold = 50; // Minimum swipe distance in pixels
+        
+        // Swipe down to show jump menu
+        if (touchStartY - touchEndY > swipeThreshold) {
+            // Swipe up - scroll to top
+            window.scrollTo({ top: 0, behavior: 'smooth' });
+        }
+    }
+}
+
 // ================ INITIALIZATION ================
 document.addEventListener('DOMContentLoaded', function () {
     console.log('JAMB Test Driller Initializing...');
@@ -2659,6 +3038,7 @@ document.addEventListener('DOMContentLoaded', function () {
     setupFileUpload();
     setupSettingsListeners();
     updateSetupUI();
+    setupMobileTouchSupport();
     
     // Load built-in questions after a short delay
     setTimeout(() => {
