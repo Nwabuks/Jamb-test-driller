@@ -15,8 +15,12 @@ const JAMB_APP = {
     },
     // User's selected subjects (max 4)
     selectedSubjects: [],
-    // Question bank for all subjects (UNLIMITED storage)
+    // Question bank for all subjects (organized by topic)
     questions: {},
+    // Topics system
+    topics: {}, // Will store {subject: {topic1: [questions], topic2: [questions]}}
+    selectedTopics: {}, // {subject: [selectedTopics]}
+    
     // Settings
     settings: {
         timer: {
@@ -173,7 +177,7 @@ function switchTab(tabName) {
         content.classList.remove('active');
     });
     // Show selected tab
-    const tabIndex = { setup: 1, upload: 2, quiz: 3, results: 4 }[tabName];
+    const tabIndex = { setup: 1, topics: 2, quiz: 3, results: 4 }[tabName];
     document.querySelector(`.tab:nth-child(${tabIndex})`).classList.add('active');
     document.getElementById(`tab-${tabName}`).classList.add('active');
     
@@ -194,8 +198,8 @@ function switchTab(tabName) {
     }
     
     // Update UI based on tab
-    if (tabName === 'upload') {
-        updateStatusGrid();
+    if (tabName === 'topics') {
+        updateTopicsTab();
     } else if (tabName === 'quiz') {
         updateQuizTab();
     } else if (tabName === 'results') {
@@ -341,10 +345,12 @@ function saveToStorage() {
         const data = {
             selectedSubjects: JAMB_APP.selectedSubjects,
             questions: JAMB_APP.questions,
+            topics: JAMB_APP.topics,
+            selectedTopics: JAMB_APP.selectedTopics,
             settings: JAMB_APP.settings,
             results: JAMB_APP.results
         };
-        localStorage.setItem('jamb_app_v4', JSON.stringify(data));
+        localStorage.setItem('jamb_app_v5', JSON.stringify(data));
         console.log('Data saved to storage');
     } catch (e) {
         console.error('Save error:', e);
@@ -354,27 +360,21 @@ function saveToStorage() {
 
 function loadFromStorage() {
     try {
-        const saved = localStorage.getItem('jamb_app_v4');
+        const saved = localStorage.getItem('jamb_app_v5');
         if (saved) {
             const data = JSON.parse(saved);
             JAMB_APP.selectedSubjects = data.selectedSubjects || [];
             JAMB_APP.questions = data.questions || {};
+            JAMB_APP.topics = data.topics || {};
+            JAMB_APP.selectedTopics = data.selectedTopics || {};
             JAMB_APP.settings = data.settings || {
                 timer: { enabled: true, minutes: 120 },
                 questions: { mode: 'default', perSubject: 20 }
             };
             JAMB_APP.results = data.results || [];
             
-            // Initialize any missing subject arrays
-            Object.keys(JAMB_APP.allSubjects).forEach(subject => {
-                if (!JAMB_APP.questions[subject]) {
-                    JAMB_APP.questions[subject] = [];
-                }
-            });
-            
             console.log('Data loaded from storage');
             updateSetupUI();
-            updateStatusGrid();
             updateQuizTab();
             updateSettingsUI();
             return true;
@@ -533,7 +533,7 @@ function saveCombination() {
     updateQuestionSettings();
     saveToStorage();
     showAlert('Settings saved successfully!', 'success');
-    switchTab('upload');
+    switchTab('topics');
 }
 
 function loadPreset(presetType) {
@@ -559,450 +559,522 @@ function setupSubjectCheckboxes() {
     });
 }
 
-// ================ BUILT-IN QUESTIONS FUNCTIONS ================
-async function loadBuiltInQuestions() {
+// ================ DATA FOLDER LOADING ================
+async function loadQuestionsFromDataFolder() {
+    console.log('Loading questions from data folder...');
+    
     try {
-        console.log('Loading built-in questions...');
-        
-        // Check if we already have questions from storage
-        let totalExistingQuestions = 0;
-        Object.values(JAMB_APP.questions).forEach(arr => {
-            totalExistingQuestions += arr.length;
-        });
-        
-        // Only load built-in questions if we have no existing questions
-        if (totalExistingQuestions === 0) {
-            console.log('No existing questions found. Loading from built-in files...');
-            
-            // Try to load sample questions first (embedded in code)
-            await loadEmbeddedSampleQuestions();
-            
-            // Then try to load from external files (if available)
-            await tryLoadExternalQuestionFiles();
-            
-            // Save after loading
-            saveToStorage();
-            
-            // Show success message
-            const subjectCount = Object.keys(JAMB_APP.questions).filter(
-                subject => JAMB_APP.questions[subject].length > 0
-            ).length;
-            
-            const totalLoadedQuestions = Object.values(JAMB_APP.questions)
-                .reduce((sum, arr) => sum + arr.length, 0);
-            
-            if (totalLoadedQuestions > 0) {
-                showAlert(`✅ Loaded ${totalLoadedQuestions} sample questions for ${subjectCount} subjects`, 'success');
-            } else {
-                showAlert('No question files found. Sample questions loaded.', 'info');
+        // First, try to load manifest.json
+        let manifest = null;
+        try {
+            const manifestResponse = await fetch('data/manifest.json');
+            if (manifestResponse.ok) {
+                manifest = await manifestResponse.json();
+                console.log('Manifest loaded:', manifest);
             }
-            
-            // Update UI
-            updateStatusGrid();
-            updateQuizTab();
-            
-            return true;
-        } else {
-            console.log(`Using existing ${totalExistingQuestions} questions from storage`);
-            return false;
+        } catch (e) {
+            console.log('No manifest found, will scan data folder');
         }
         
+        // Initialize topics structure
+        JAMB_APP.topics = {};
+        JAMB_APP.selectedTopics = {};
+        
+        if (manifest && manifest.files && Array.isArray(manifest.files)) {
+            // Load files listed in manifest
+            await loadFromManifest(manifest.files);
+        } else {
+            // Scan for common question file patterns
+            await scanDataFolder();
+        }
+        
+        // Initialize all subjects with empty topics if no data found
+        Object.keys(JAMB_APP.allSubjects).forEach(subject => {
+            if (!JAMB_APP.topics[subject]) {
+                JAMB_APP.topics[subject] = {
+                    'General': JAMB_APP.questions[subject] || []
+                };
+            }
+            // Initialize selected topics (select all by default)
+            if (!JAMB_APP.selectedTopics[subject]) {
+                JAMB_APP.selectedTopics[subject] = Object.keys(JAMB_APP.topics[subject]);
+            }
+        });
+        
+        // Build questions array from selected topics
+        rebuildQuestionsFromTopics();
+        
+        // Save to storage
+        saveToStorage();
+        
+        // Show success message
+        let totalQuestions = 0;
+        let subjectsWithQuestions = 0;
+        
+        Object.keys(JAMB_APP.questions).forEach(subject => {
+            const count = JAMB_APP.questions[subject]?.length || 0;
+            totalQuestions += count;
+            if (count > 0) subjectsWithQuestions++;
+        });
+        
+        console.log(`✅ Loaded ${totalQuestions} questions for ${subjectsWithQuestions} subjects from data folder`);
+        
+        // Update UI
+        updateTopicsTab();
+        updateQuizTab();
+        
+        return true;
+        
     } catch (error) {
-        console.error('Error in loadBuiltInQuestions:', error);
-        showAlert('Could not load built-in questions. Using sample questions instead.', 'error');
-        loadSampleQuestions(); // Fallback to hardcoded sample
+        console.error('Error loading from data folder:', error);
+        showAlert('Error loading questions from data folder', 'error');
         return false;
     }
 }
 
-// Helper function to load embedded sample questions
-async function loadEmbeddedSampleQuestions() {
-    console.log('Loading embedded sample questions...');
+async function loadFromManifest(files) {
+    console.log('Loading from manifest files:', files);
     
-    const sampleQuestions = {
-        subjects: [
-            {
-                subject: "english",
-                questions: [
-                    {
-                        "question": "Choose the correct spelling:",
-                        "options": ["Accomodation", "Acommodation", "Accommodation", "Acomodation"],
-                        "correctAnswer": 2,
-                        "explanation": "'Accommodation' has double 'c' and double 'm'."
-                    },
-                    {
-                        "question": "What is the plural of 'analysis'?",
-                        "options": ["Analysises", "Analyses", "Analysis", "Analysises"],
-                        "correctAnswer": 1,
-                        "explanation": "The plural of analysis is 'analyses'."
-                    },
-                    {
-                        "question": "Identify the grammatically correct sentence:",
-                        "options": ["He don't like apples", "He doesn't likes apples", "He doesn't like apples", "He don't likes apples"],
-                        "correctAnswer": 2,
-                        "explanation": "'He' is third person singular, so it requires 'doesn't' and the base form 'like'."
-                    }
-                ]
-            },
-            {
-                subject: "mathematics",
-                questions: [
-                    {
-                        "question": "If x + 5 = 12, what is x?",
-                        "options": ["5", "6", "7", "8"],
-                        "correctAnswer": 2,
-                        "explanation": "x = 12 - 5 = 7"
-                    },
-                    {
-                        "question": "What is 15% of 200?",
-                        "options": ["20", "30", "25", "35"],
-                        "correctAnswer": 1,
-                        "explanation": "15% of 200 = 0.15 × 200 = 30"
-                    },
-                    {
-                        "question": "Solve for y: 2y - 8 = 10",
-                        "options": ["y = 6", "y = 7", "y = 8", "y = 9"],
-                        "correctAnswer": 3,
-                        "explanation": "2y = 18, so y = 9"
-                    }
-                ]
-            },
-            {
-                subject: "physics",
-                questions: [
-                    {
-                        "question": "What is the SI unit of force?",
-                        "options": ["Joule", "Newton", "Watt", "Pascal"],
-                        "correctAnswer": 1,
-                        "explanation": "Force is measured in Newtons (N)."
-                    },
-                    {
-                        "question": "Which law states that for every action there is an equal and opposite reaction?",
-                        "options": ["Newton's First Law", "Newton's Second Law", "Newton's Third Law", "Ohm's Law"],
-                        "correctAnswer": 2,
-                        "explanation": "Newton's Third Law describes action-reaction pairs."
-                    }
-                ]
-            },
-            {
-                subject: "chemistry",
-                questions: [
-                    {
-                        "question": "What is the chemical symbol for gold?",
-                        "options": ["Go", "Gd", "Au", "Ag"],
-                        "correctAnswer": 2,
-                        "explanation": "Gold is represented by Au from Latin 'aurum'."
-                    },
-                    {
-                        "question": "What is the pH of pure water?",
-                        "options": ["5", "6", "7", "8"],
-                        "correctAnswer": 2,
-                        "explanation": "Pure water is neutral with pH 7 at 25°C."
-                    }
-                ]
-            }
-        ]
-    };
-    
-    const added = addQuestionsFromData(sampleQuestions);
-    console.log(`✅ Added ${added} embedded sample questions`);
-    return added;
-}
-
-// Helper function to try loading external files
-async function tryLoadExternalQuestionFiles() {
-    console.log('Trying to load external question files...');
-    
-    const possibleFilePaths = [
-        'data/questions.json',
-        'questions.json',
-        'data/manifest.json',
-        'manifest.json',
-        'data/que_english.json',
-        'que_english.json',
-        'data/que_mathematics.json',
-        'que_mathematics.json'
-    ];
-    
-    let loadedAnyExternal = false;
-    
-    for (const filePath of possibleFilePaths) {
+    for (const file of files) {
         try {
-            console.log(`Trying to fetch: ${filePath}`);
-            const response = await fetch(filePath);
-            
+            const response = await fetch(`data/${file}`);
             if (response.ok) {
                 const data = await response.json();
-                const added = addQuestionsFromData(data);
-                
-                if (added > 0) {
-                    loadedAnyExternal = true;
-                    console.log(`✅ Successfully loaded ${added} questions from ${filePath}`);
-                }
-            } else {
-                console.log(`⚠️ Could not load ${filePath} (HTTP ${response.status})`);
+                processQuestionFile(data, file);
             }
         } catch (error) {
-            console.log(`❌ Error loading ${filePath}: ${error.message}`);
-            // Continue trying other files
+            console.error(`Error loading ${file}:`, error);
         }
     }
-    
-    return loadedAnyExternal;
 }
 
-function loadQuestionsFromData(data) {
-    if (!data || !data.subjects) return;
+async function scanDataFolder() {
+    console.log('Scanning data folder for question files...');
     
-    // Initialize empty arrays for all subjects
-    Object.keys(JAMB_APP.allSubjects).forEach(subject => {
+    // Common file patterns to try
+    const commonPatterns = [
+        'questions.json',
+        'english.json',
+        'mathematics.json',
+        'physics.json',
+        'chemistry.json',
+        'biology.json',
+        'government.json',
+        'economics.json',
+        'commerce.json',
+        'accounting.json',
+        'literature.json'
+    ];
+    
+    for (const pattern of commonPatterns) {
+        try {
+            const response = await fetch(`data/${pattern}`);
+            if (response.ok) {
+                const data = await response.json();
+                processQuestionFile(data, pattern);
+            }
+        } catch (error) {
+            // File not found, continue
+        }
+    }
+}
+
+function processQuestionFile(data, filename) {
+    console.log(`Processing ${filename}:`, data);
+    
+    if (data.subjects && Array.isArray(data.subjects)) {
+        // Format B: Multiple subjects
+        data.subjects.forEach(subjectData => {
+            addSubjectData(subjectData);
+        });
+    } else if (data.subject && Array.isArray(data.questions)) {
+        // Format A: Single subject
+        addSubjectData(data);
+    } else if (data.topic && Array.isArray(data.questions)) {
+        // Topic-based format
+        const subject = filename.replace('.json', '').toLowerCase();
+        addTopicData(subject, data.topic, data.questions);
+    } else {
+        console.log(`Unknown format in ${filename}`);
+    }
+}
+
+function addSubjectData(subjectData) {
+    const subject = subjectData.subject.toLowerCase();
+    const questions = subjectData.questions || [];
+    const topic = subjectData.topic || 'General';
+    
+    addTopicData(subject, topic, questions);
+}
+
+function addTopicData(subject, topicName, questions) {
+    if (!JAMB_APP.allSubjects[subject]) {
+        console.log(`Unknown subject: ${subject}`);
+        return;
+    }
+    
+    if (!JAMB_APP.topics[subject]) {
+        JAMB_APP.topics[subject] = {};
+    }
+    
+    if (!JAMB_APP.topics[subject][topicName]) {
+        JAMB_APP.topics[subject][topicName] = [];
+    }
+    
+    // Add questions to topic
+    JAMB_APP.topics[subject][topicName].push(...questions);
+    
+    console.log(`Added ${questions.length} questions to ${subject} > ${topicName}`);
+}
+
+function rebuildQuestionsFromTopics() {
+    // Clear existing questions
+    Object.keys(JAMB_APP.questions).forEach(subject => {
         JAMB_APP.questions[subject] = [];
     });
     
-    // Load questions from data
-    data.subjects.forEach(subjectData => {
-        const subject = subjectData.subject.toLowerCase();
-        if (JAMB_APP.allSubjects[subject] && Array.isArray(subjectData.questions)) {
-            // Take ALL questions (no limit for storage)
-            JAMB_APP.questions[subject] = [...subjectData.questions];
-            console.log(`Loaded ${subjectData.questions.length} questions for ${subject}`);
-        }
+    // Rebuild from selected topics
+    Object.keys(JAMB_APP.selectedTopics).forEach(subject => {
+        if (!JAMB_APP.topics[subject]) return;
+        
+        const selectedTopics = JAMB_APP.selectedTopics[subject];
+        selectedTopics.forEach(topic => {
+            if (JAMB_APP.topics[subject][topic]) {
+                JAMB_APP.questions[subject].push(...JAMB_APP.topics[subject][topic]);
+            }
+        });
     });
-    
-    saveToStorage();
 }
 
-function resetToBuiltInQuestions() {
-    if (confirm('This will replace ALL your current questions with built-in questions from manifest. Continue?')) {
-        // Clear all current questions
-        Object.keys(JAMB_APP.questions).forEach(subject => {
-            JAMB_APP.questions[subject] = [];
+// ================ TOPICS TAB FUNCTIONS ================
+function updateTopicsTab() {
+    const container = document.getElementById('topics-container');
+    
+    if (Object.keys(JAMB_APP.topics).length === 0) {
+        container.innerHTML = `
+            <div style="text-align: center; padding: 40px 20px; color: #666;">
+                <i class="fas fa-book" style="font-size: 48px; margin-bottom: 20px;"></i>
+                <h3>No Topics Loaded</h3>
+                <p>Questions will be loaded automatically from the data folder</p>
+                <button class="btn" onclick="loadQuestionsFromDataFolder()" style="margin-top: 20px;">
+                    <i class="fas fa-sync"></i> Load Questions Now
+                </button>
+            </div>
+        `;
+        return;
+    }
+    
+    let html = '';
+    
+    // Show only selected subjects
+    const subjectsToShow = JAMB_APP.selectedSubjects.length > 0 
+        ? JAMB_APP.selectedSubjects 
+        : Object.keys(JAMB_APP.topics);
+    
+    subjectsToShow.forEach(subject => {
+        const subjectInfo = JAMB_APP.allSubjects[subject];
+        const topics = JAMB_APP.topics[subject];
+        
+        if (!topics || Object.keys(topics).length === 0) {
+            return;
+        }
+        
+        const selectedTopics = JAMB_APP.selectedTopics[subject] || [];
+        const totalTopics = Object.keys(topics).length;
+        const selectedCount = selectedTopics.length;
+        
+        html += `
+            <div class="topic-category">
+                <div class="topic-category-header">
+                    <i class="fas fa-${subjectInfo.icon}"></i>
+                    <div style="flex: 1;">
+                        <h3 style="margin: 0 0 5px 0;">${subjectInfo.name}</h3>
+                        <div style="font-size: 14px; color: #666;">
+                            ${selectedCount}/${totalTopics} topics selected
+                        </div>
+                    </div>
+                </div>
+                
+                <div class="topic-actions">
+                    <button class="select-all-btn" onclick="selectAllTopics('${subject}')">
+                        <i class="fas fa-check-square"></i> Select All
+                    </button>
+                    <button class="deselect-all-btn" onclick="deselectAllTopics('${subject}')">
+                        <i class="fas fa-square"></i> Deselect All
+                    </button>
+                </div>
+                
+                <div class="topics-grid">
+        `;
+        
+        Object.keys(topics).forEach(topicName => {
+            const topicQuestions = topics[topicName] || [];
+            const isSelected = selectedTopics.includes(topicName);
+            
+            html += `
+                <label class="topic-checkbox ${isSelected ? 'selected' : ''}" 
+                       onclick="toggleTopic('${subject}', '${topicName}')">
+                    <div class="topic-name">
+                        ${isSelected ? '<i class="fas fa-check" style="margin-right: 8px; color: #4caf50;"></i>' : ''}
+                        ${topicName}
+                    </div>
+                    <div class="topic-count">${topicQuestions.length} questions</div>
+                </label>
+            `;
         });
         
-        // Reload built-in questions from manifest
-        loadBuiltInQuestions();
-        updateStatusGrid();
-        updateQuizTab();
-        showAlert('Reset to built-in questions completed. All files from manifest reloaded.', 'success');
+        html += `
+                </div>
+            </div>
+        `;
+    });
+    
+    if (html === '') {
+        html = `
+            <div style="text-align: center; padding: 40px 20px; color: #666;">
+                <i class="fas fa-info-circle" style="font-size: 48px; margin-bottom: 20px;"></i>
+                <h3>No Topics Available</h3>
+                <p>Select subjects in Setup tab or add question files to data folder</p>
+                <button class="btn" onclick="switchTab('setup')" style="margin-top: 20px;">
+                    <i class="fas fa-cog"></i> Go to Setup
+                </button>
+            </div>
+        `;
     }
+    
+    container.innerHTML = html;
 }
 
-// ================ UPLOAD TAB FUNCTIONS ================
-// ================ UPLOAD TAB FUNCTIONS ================
-function updateStatusGrid() {
-    const grid = document.getElementById('status-grid');
-    grid.innerHTML = '';
+function toggleTopic(subject, topic) {
+    if (!JAMB_APP.selectedTopics[subject]) {
+        JAMB_APP.selectedTopics[subject] = [];
+    }
+    
+    const index = JAMB_APP.selectedTopics[subject].indexOf(topic);
+    if (index === -1) {
+        // Add topic
+        JAMB_APP.selectedTopics[subject].push(topic);
+    } else {
+        // Remove topic
+        JAMB_APP.selectedTopics[subject].splice(index, 1);
+    }
+    
+    // Rebuild questions from selected topics
+    rebuildQuestionsFromTopics();
+    
+    // Save and update UI
+    saveToStorage();
+    updateTopicsTab(); // This refreshes the topics display
+    updateQuizTab();
+    
+    const subjectName = JAMB_APP.allSubjects[subject]?.name || subject;
+    showAlert(`Updated topics for ${subjectName}`, 'success');
+}
+
+function selectAllTopics(subject) {
+    if (!JAMB_APP.topics[subject]) return;
+    
+    // Get ALL available topics for this subject
+    const allTopics = Object.keys(JAMB_APP.topics[subject]);
+    
+    // Select all topics
+    JAMB_APP.selectedTopics[subject] = [...allTopics];
+    
+    // Rebuild questions and update UI
+    rebuildQuestionsFromTopics();
+    saveToStorage();
+    updateTopicsTab();
+    updateQuizTab();
+    
+    const subjectName = JAMB_APP.allSubjects[subject]?.name || subject;
+    showAlert(`Selected all ${allTopics.length} topics for ${subjectName}`, 'success');
+}
+
+function deselectAllTopics(subject) {
+    // Empty the selected topics array
+    JAMB_APP.selectedTopics[subject] = [];
+    
+    // Rebuild questions and update UI
+    rebuildQuestionsFromTopics();
+    saveToStorage();
+    updateTopicsTab();
+    updateQuizTab();
+    
+    const subjectName = JAMB_APP.allSubjects[subject]?.name || subject;
+    showAlert(`Deselected all topics for ${subjectName}`, 'info');
+}
+
+function deselectAllTopics(subject) {
+    JAMB_APP.selectedTopics[subject] = [];
+    rebuildQuestionsFromTopics();
+    saveToStorage();
+    updateTopicsTab();
+    updateQuizTab();
+    
+    const subjectName = JAMB_APP.allSubjects[subject]?.name || subject;
+    showAlert(`Deselected all topics for ${subjectName}`, 'info');
+}
+
+// ================ QUIZ TAB FUNCTIONS ================
+function updateQuizTab() {
+    const container = document.getElementById('quizContainer');
+    if (JAMB_APP.currentQuiz) {
+        return;
+    }
+    container.innerHTML = `
+        <div style="text-align: center; padding: 50px 20px;">
+            <h3>Ready for JAMB Practice?</h3>
+            <p>Questions loaded from data folder for your selected subjects</p>
+            <div class="subjects-grid" style="margin: 30px auto; max-width: 600px;" id="quiz-subjects-grid">
+            </div>
+            <div style="background: #f5f5f5; padding: 20px; border-radius: 10px; margin: 20px auto; max-width: 600px;">
+                <h4><i class="fas fa-cog"></i> Quiz Settings</h4>
+                <div style="margin: 15px 0;">
+                    <div style="display: flex; align-items: center; justify-content: space-between; margin-bottom: 10px;">
+                        <span>Questions per subject:</span>
+                        <span id="selected-questions-count">All available</span>
+                    </div>
+                    <div style="display: flex; align-items: center; justify-content: space-between; margin-bottom: 10px;">
+                        <span>Total questions:</span>
+                        <span id="total-questions-count">0</span>
+                    </div>
+                    <div style="display: flex; align-items: center; justify-content: space-between;">
+                        <span>Timer:</span>
+                        <span id="selected-timer">120 minutes</span>
+                    </div>
+                </div>
+            </div>
+            <button class="btn" onclick="startFullJAMBQuiz()" id="start-jamb-btn" disabled>
+                <i class="fas fa-play"></i> Start Full JAMB Simulation
+            </button>
+            <button class="btn btn-secondary" onclick="practiceCustomQuiz()" id="custom-quiz-btn" disabled>
+                <i class="fas fa-sliders-h"></i> Custom Quiz
+            </button>
+        </div>
+    `;
+    const subjectsGrid = document.getElementById('quiz-subjects-grid');
+    subjectsGrid.innerHTML = '';
+    let allSubjectsHaveQuestions = true;
+    let totalQuestionsAvailable = 0;
     if (JAMB_APP.selectedSubjects.length === 0) {
-        grid.innerHTML = `
+        subjectsGrid.innerHTML = `
             <div style="grid-column: 1 / -1; text-align: center; padding: 20px; color: #666;">
                 <i class="fas fa-info-circle" style="font-size: 24px; margin-bottom: 10px;"></i>
                 <p>No subjects selected. Please select subjects in the Setup tab.</p>
             </div>
         `;
+        document.getElementById('start-jamb-btn').disabled = true;
+        document.getElementById('custom-quiz-btn').disabled = true;
         return;
     }
     JAMB_APP.selectedSubjects.forEach(subject => {
         const subjectInfo = JAMB_APP.allSubjects[subject];
         const count = JAMB_APP.questions[subject]?.length || 0;
-        const statusItem = document.createElement('div');
-        statusItem.className = `status-item ${count > 0 ? 'loaded' : ''}`;
-        statusItem.innerHTML = `
-            <div class="status-subject">
-                <i class="fas fa-${subjectInfo.icon}"></i> ${subjectInfo.name}
-            </div>
-            <div class="status-count">${count} questions</div>
-            <div style="font-size: 12px;">available</div>
-            ${count >= 100 ? 
-                '<div style="font-size: 11px; color: #4caf50; margin-top: 5px;">✓ Ready for JAMB quiz</div>' : 
-                count > 0 ? 
-                '<div style="font-size: 11px; color: #ff9800; margin-top: 5px;">Available for practice</div>' :
-                '<div style="font-size: 11px; color: #f44336; margin-top: 5px;">No questions</div>'}
-        `;
-        grid.appendChild(statusItem);
-    });
-}
-
-function setupFileUpload() {
-    const fileInput = document.getElementById('jsonFile');
-    const uploadBox = document.querySelector('.upload-box');
-    
-    fileInput.addEventListener('change', function (e) {
-        if (this.files.length > 0) {
-            processJSONFile(this.files[0]);
-            this.value = '';
+        totalQuestionsAvailable += count;
+        if (count === 0) allSubjectsHaveQuestions = false;
+        const card = document.createElement('div');
+        card.className = `subject-card ${count > 0 ? 'has-questions' : 'no-questions'}`;
+        if (count > 0) {
+            // Count selected topics
+            const selectedTopics = JAMB_APP.selectedTopics[subject] || [];
+            const totalTopics = JAMB_APP.topics[subject] ? Object.keys(JAMB_APP.topics[subject]).length : 0;
+            
+            card.innerHTML = `
+                <div class="subject-icon">
+                    <i class="fas fa-${subjectInfo.icon}"></i>
+                </div>
+                <div class="subject-name">${subjectInfo.name}</div>
+                <div class="question-count">${count} questions available</div>
+                <div style="font-size: 12px; color: #4caf50; margin: 5px 0;">
+                    <i class="fas fa-check-circle"></i> ${selectedTopics.length}/${totalTopics} topics selected
+                </div>
+                <button class="btn" onclick="practiceSubject('${subject}')" style="margin-top: 10px; padding: 8px 15px; font-size: 14px;">
+                    <i class="fas fa-play"></i> Practice
+                </button>
+            `;
+        } else {
+            card.innerHTML = `
+                <div class="subject-icon">
+                    <i class="fas fa-${subjectInfo.icon}"></i>
+                </div>
+                <div class="subject-name">${subjectInfo.name}</div>
+                <div class="question-count">No questions available</div>
+                <div style="font-size: 12px; color: #f44336; margin: 5px 0;">
+                    <i class="fas fa-exclamation-circle"></i> No questions in data folder
+                </div>
+                <button class="btn" onclick="switchTab('topics')" style="margin-top: 10px; padding: 8px 15px; font-size: 14px; background: #666;">
+                    <i class="fas fa-book"></i> Check Topics
+                </button>
+            `;
         }
+        subjectsGrid.appendChild(card);
     });
-    
-    ['dragenter', 'dragover', 'dragleave', 'drop'].forEach(eventName => {
-        uploadBox.addEventListener(eventName, preventDefaults, false);
-    });
-    
-    function preventDefaults(e) {
-        e.preventDefault();
-        e.stopPropagation();
+    let questionsPerQuiz = 0;
+    if (JAMB_APP.settings.questions.mode === 'custom') {
+        questionsPerQuiz = JAMB_APP.settings.questions.perSubject * JAMB_APP.selectedSubjects.length;
+        document.getElementById('selected-questions-count').textContent = `${JAMB_APP.settings.questions.perSubject} per subject`;
+    } else {
+        const perSubject = JAMB_APP.selectedSubjects.map(s => {
+            const count = JAMB_APP.questions[s]?.length || 0;
+            return Math.min(count, JAMB_APP.MAX_QUESTIONS_PER_QUIZ);
+        });
+        questionsPerQuiz = perSubject.reduce((a, b) => a + b, 0);
+        document.getElementById('selected-questions-count').textContent = 'All available';
     }
-    
-    ['dragenter', 'dragover'].forEach(eventName => {
-        uploadBox.addEventListener(eventName, () => {
-            uploadBox.style.background = '#e8eaf6';
-            uploadBox.style.borderColor = '#3700b3';
-        }, false);
-    });
-    
-    ['dragleave', 'drop'].forEach(eventName => {
-        uploadBox.addEventListener(eventName, () => {
-            uploadBox.style.background = '#f8f9ff';
-            uploadBox.style.borderColor = '#6200ea';
-        }, false);
-    });
-    
-    uploadBox.addEventListener('drop', function (e) {
-        const files = e.dataTransfer.files;
-        if (files.length > 0) {
-            processJSONFile(files[0]);
-        }
-    }, false);
+    document.getElementById('total-questions-count').textContent = questionsPerQuiz;
+    const timerText = JAMB_APP.settings.timer.enabled ?
+        `${JAMB_APP.settings.timer.minutes} minutes` :
+        'No timer (Practice Mode)';
+    document.getElementById('selected-timer').textContent = timerText;
+    document.getElementById('start-jamb-btn').disabled = !allSubjectsHaveQuestions;
+    document.getElementById('custom-quiz-btn').disabled = !allSubjectsHaveQuestions;
 }
 
-function processJSONFile(file) {
-    if (!file || !file.name.endsWith('.json')) {
-        showAlert('Please select a JSON file', 'error');
+function practiceSubject(subject) {
+    const questions = JAMB_APP.questions[subject];
+    if (!questions || questions.length === 0) {
+        showAlert(`No questions available for ${JAMB_APP.allSubjects[subject]?.name || subject}`, 'error');
         return;
     }
     
-    // Check if filename starts with "que_"
-    if (!file.name.toLowerCase().startsWith('que_')) {
-        showAlert('Please select a JSON file that starts with "que_"', 'error');
-        return;
+    let questionsToUse;
+    if (JAMB_APP.settings.questions.mode === 'custom') {
+        questionsToUse = Math.min(JAMB_APP.settings.questions.perSubject, questions.length);
+    } else {
+        // Use all available questions, but max 100 per quiz
+        questionsToUse = Math.min(questions.length, JAMB_APP.MAX_QUESTIONS_PER_QUIZ);
     }
     
-    const reader = new FileReader();
-    reader.onload = function (e) {
-        try {
-            console.log('Processing file:', file.name);
-            const data = JSON.parse(e.target.result);
-            if (validateJSON(data)) {
-                const added = addQuestionsFromData(data);
-                saveToStorage();
-                updateStatusGrid();
-                updateQuizTab();
-                showAlert(`Added ${added} question(s) successfully from ${file.name}!`, 'success');
-            } else {
-                showAlert('Invalid JSON format. Check the guide.', 'error');
-            }
-        } catch (error) {
-            console.error('Parse error:', error);
-            showAlert(`Error: ${error.message}`, 'error');
-        }
-    };
-    reader.onerror = function () {
-        showAlert('Error reading file', 'error');
-    };
-    reader.readAsText(file);
+    startSubjectQuiz(subject, questionsToUse);
 }
 
-function validateJSON(data) {
-    if (data.subject && Array.isArray(data.questions)) {
-        const subject = data.subject.toLowerCase();
-        return JAMB_APP.allSubjects[subject] !== undefined;
-    }
-    if (Array.isArray(data.subjects)) {
-        return data.subjects.every(subject =>
-            subject.subject && Array.isArray(subject.questions) &&
-            JAMB_APP.allSubjects[subject.subject.toLowerCase()] !== undefined
-        );
-    }
-    return false;
-}
-
-function addQuestionsFromData(data) {
-    let addedCount = 0;
-    if (data.subjects && Array.isArray(data.subjects)) {
-        data.subjects.forEach(subjectData => {
-            const subject = subjectData.subject.toLowerCase();
-            if (JAMB_APP.allSubjects[subject] && JAMB_APP.questions[subject] !== undefined) {
-                const questions = subjectData.questions || [];
-                // UNLIMITED - add all questions
-                JAMB_APP.questions[subject].push(...questions);
-                addedCount += questions.length;
-                console.log(`Added ${questions.length} questions to ${subject} (Total: ${JAMB_APP.questions[subject].length})`);
-            }
-        });
-    } else if (data.subject && Array.isArray(data.questions)) {
-        const subject = data.subject.toLowerCase();
-        if (JAMB_APP.allSubjects[subject] && JAMB_APP.questions[subject] !== undefined) {
-            const questions = data.questions || [];
-            // UNLIMITED - add all questions
-            JAMB_APP.questions[subject].push(...questions);
-            addedCount += questions.length;
-            console.log(`Added ${questions.length} questions to ${subject} (Total: ${JAMB_APP.questions[subject].length})`);
-        }
-    }
-    return addedCount;
-}
-
-function loadSampleQuestions() {
-    console.log('Loading fallback sample questions...');
+function startSubjectQuiz(subject, questionCount, useTimer = JAMB_APP.settings.timer.enabled, minutes = JAMB_APP.settings.timer.minutes) {
+    const questions = JAMB_APP.questions[subject];
+    if (!questions || questions.length === 0) return;
     
-    const sampleData = {
-        subjects: [
-            {
-                subject: "english",
-                questions: [
-                    {
-                        "question": "Choose the correct spelling:",
-                        "options": ["Accomodation", "Acommodation", "Accommodation", "Acomodation"],
-                        "correctAnswer": 2,
-                        "explanation": "'Accommodation' has double 'c' and double 'm'."
-                    },
-                    {
-                        "question": "What is the plural of 'analysis'?",
-                        "options": ["Analysises", "Analyses", "Analysis", "Analysises"],
-                        "correctAnswer": 1,
-                        "explanation": "The plural of analysis is 'analyses'."
-                    }
-                ]
-            },
-            {
-                subject: "mathematics",
-                questions: [
-                    {
-                        "question": "If x + 5 = 12, what is x?",
-                        "options": ["5", "6", "7", "8"],
-                        "correctAnswer": 2,
-                        "explanation": "x = 12 - 5 = 7"
-                    },
-                    {
-                        "question": "What is 15% of 200?",
-                        "options": ["20", "30", "25", "35"],
-                        "correctAnswer": 1,
-                        "explanation": "15% of 200 = 0.15 × 200 = 30"
-                    }
-                ]
-            }
-        ]
+    // Use up to MAX_QUESTIONS_PER_QUIZ (100) for quiz
+    const quizQuestions = [...questions]
+        .sort(() => Math.random() - 0.5)
+        .slice(0, Math.min(questionCount, JAMB_APP.MAX_QUESTIONS_PER_QUIZ));
+    
+    JAMB_APP.currentQuiz = {
+        type: 'subject',
+        subject: subject,
+        questions: quizQuestions,
+        currentIndex: 0,
+        score: 0,
+        answers: new Array(quizQuestions.length).fill(null),
+        startTime: new Date(),
+        totalTime: useTimer ? minutes * 60 : 0,
+        timerUsed: useTimer,
+        timerSetting: minutes,
+        results: null
     };
     
-    const added = addQuestionsFromData(sampleData);
-    saveToStorage();
-    updateStatusGrid();
-    updateQuizTab();
-    showAlert(`Loaded ${added} sample questions for your subjects`, 'success');
+    showQuizInterface();
 }
 
-function clearAllQuestions() {
-    if (confirm('Clear ALL questions from ALL subjects?')) {
-        Object.keys(JAMB_APP.questions).forEach(subject => {
-            JAMB_APP.questions[subject] = [];
-        });
-        saveToStorage();
-        updateStatusGrid();
-        updateQuizTab();
-        showAlert('All questions cleared', 'success');
-    }
-}
-
-// ================ CUSTOM QUIZ FUNCTIONS (INDIVIDUAL QUESTIONS PER SUBJECT) ================
+// ================ CUSTOM QUIZ FUNCTIONS ================
 function practiceCustomQuiz() {
     openCustomQuizModal();
 }
@@ -1164,20 +1236,6 @@ function updateCustomQuizSummary() {
     }
 }
 
-function updateCustomQuizTimerDisplay() {
-    const timerDisplaySpan = document.getElementById('custom-timer-display');
-    
-    // Use timer from setup tab
-    let timerText = '';
-    if (JAMB_APP.settings.timer.enabled) {
-        timerText = `${JAMB_APP.settings.timer.minutes} minutes`;
-    } else {
-        timerText = 'No timer (Practice Mode)';
-    }
-    
-    timerDisplaySpan.textContent = timerText;
-}
-
 function closeCustomQuizModal() {
     const modal = document.getElementById('customQuizModal');
     modal.style.display = 'none';
@@ -1233,161 +1291,7 @@ function startCustomQuiz() {
     startCustomQuizWithSettings(subjectQuestions, timerSettings);
 }
 
-// ================ QUIZ TAB FUNCTIONS ================
-function updateQuizTab() {
-    const container = document.getElementById('quizContainer');
-    if (JAMB_APP.currentQuiz) {
-        return;
-    }
-    container.innerHTML = `
-        <div style="text-align: center; padding: 50px 20px;">
-            <h3>Ready for JAMB Practice?</h3>
-            <p>Built-in questions are automatically loaded for your selected subjects</p>
-            <div class="subjects-grid" style="margin: 30px auto; max-width: 600px;" id="quiz-subjects-grid">
-            </div>
-            <div style="background: #f5f5f5; padding: 20px; border-radius: 10px; margin: 20px auto; max-width: 600px;">
-                <h4><i class="fas fa-cog"></i> Quiz Settings</h4>
-                <div style="margin: 15px 0;">
-                    <div style="display: flex; align-items: center; justify-content: space-between; margin-bottom: 10px;">
-                        <span>Questions per subject:</span>
-                        <span id="selected-questions-count">All available</span>
-                    </div>
-                    <div style="display: flex; align-items: center; justify-content: space-between; margin-bottom: 10px;">
-                        <span>Total questions:</span>
-                        <span id="total-questions-count">0</span>
-                    </div>
-                    <div style="display: flex; align-items: center; justify-content: space-between;">
-                        <span>Timer:</span>
-                        <span id="selected-timer">120 minutes</span>
-                    </div>
-                </div>
-            </div>
-            <button class="btn" onclick="startFullJAMBQuiz()" id="start-jamb-btn" disabled>
-                <i class="fas fa-play"></i> Start Full JAMB Simulation
-            </button>
-            <button class="btn btn-secondary" onclick="practiceCustomQuiz()" id="custom-quiz-btn" disabled>
-                <i class="fas fa-sliders-h"></i> Custom Quiz
-            </button>
-        </div>
-    `;
-    const subjectsGrid = document.getElementById('quiz-subjects-grid');
-    subjectsGrid.innerHTML = '';
-    let allSubjectsHaveQuestions = true;
-    let totalQuestionsAvailable = 0;
-    if (JAMB_APP.selectedSubjects.length === 0) {
-        subjectsGrid.innerHTML = `
-            <div style="grid-column: 1 / -1; text-align: center; padding: 20px; color: #666;">
-                <i class="fas fa-info-circle" style="font-size: 24px; margin-bottom: 10px;"></i>
-                <p>No subjects selected. Please select subjects in the Setup tab.</p>
-            </div>
-        `;
-        document.getElementById('start-jamb-btn').disabled = true;
-        document.getElementById('custom-quiz-btn').disabled = true;
-        return;
-    }
-    JAMB_APP.selectedSubjects.forEach(subject => {
-        const subjectInfo = JAMB_APP.allSubjects[subject];
-        const count = JAMB_APP.questions[subject]?.length || 0;
-        totalQuestionsAvailable += count;
-        if (count === 0) allSubjectsHaveQuestions = false;
-        const card = document.createElement('div');
-        card.className = `subject-card ${count > 0 ? 'has-questions' : 'no-questions'}`;
-        if (count > 0) {
-            card.innerHTML = `
-                <div class="subject-icon">
-                    <i class="fas fa-${subjectInfo.icon}"></i>
-                </div>
-                <div class="subject-name">${subjectInfo.name}</div>
-                <div class="question-count">${count} questions available</div>
-                <div style="font-size: 12px; color: #4caf50; margin: 5px 0;">
-                    <i class="fas fa-check-circle"></i> Ready for practice
-                </div>
-                <button class="btn" onclick="practiceSubject('${subject}')" style="margin-top: 10px; padding: 8px 15px; font-size: 14px;">
-                    <i class="fas fa-play"></i> Practice
-                </button>
-            `;
-        } else {
-            card.innerHTML = `
-                <div class="subject-icon">
-                    <i class="fas fa-${subjectInfo.icon}"></i>
-                </div>
-                <div class="subject-name">${subjectInfo.name}</div>
-                <div class="question-count">No questions available</div>
-                <div style="font-size: 12px; color: #f44336; margin: 5px 0;">
-                    <i class="fas fa-exclamation-circle"></i> Add questions first
-                </div>
-                <button class="btn" onclick="switchTab('upload')" style="margin-top: 10px; padding: 8px 15px; font-size: 14px; background: #666;">
-                    <i class="fas fa-upload"></i> Add Questions
-                </button>
-            `;
-        }
-        subjectsGrid.appendChild(card);
-    });
-    let questionsPerQuiz = 0;
-    if (JAMB_APP.settings.questions.mode === 'custom') {
-        questionsPerQuiz = JAMB_APP.settings.questions.perSubject * JAMB_APP.selectedSubjects.length;
-        document.getElementById('selected-questions-count').textContent = `${JAMB_APP.settings.questions.perSubject} per subject`;
-    } else {
-        const perSubject = JAMB_APP.selectedSubjects.map(s => {
-            const count = JAMB_APP.questions[s]?.length || 0;
-            return Math.min(count, JAMB_APP.MAX_QUESTIONS_PER_QUIZ);
-        });
-        questionsPerQuiz = perSubject.reduce((a, b) => a + b, 0);
-        document.getElementById('selected-questions-count').textContent = 'All available';
-    }
-    document.getElementById('total-questions-count').textContent = questionsPerQuiz;
-    const timerText = JAMB_APP.settings.timer.enabled ?
-        `${JAMB_APP.settings.timer.minutes} minutes` :
-        'No timer (Practice Mode)';
-    document.getElementById('selected-timer').textContent = timerText;
-    document.getElementById('start-jamb-btn').disabled = !allSubjectsHaveQuestions;
-    document.getElementById('custom-quiz-btn').disabled = !allSubjectsHaveQuestions;
-}
-
-function practiceSubject(subject) {
-    const questions = JAMB_APP.questions[subject];
-    if (!questions || questions.length === 0) {
-        showAlert(`No questions available for ${JAMB_APP.allSubjects[subject]?.name || subject}`, 'error');
-        return;
-    }
-    
-    let questionsToUse;
-    if (JAMB_APP.settings.questions.mode === 'custom') {
-        questionsToUse = Math.min(JAMB_APP.settings.questions.perSubject, questions.length);
-    } else {
-        // Use all available questions, but max 100 per quiz
-        questionsToUse = Math.min(questions.length, JAMB_APP.MAX_QUESTIONS_PER_QUIZ);
-    }
-    
-    startSubjectQuiz(subject, questionsToUse);
-}
-
-function startSubjectQuiz(subject, questionCount, useTimer = JAMB_APP.settings.timer.enabled, minutes = JAMB_APP.settings.timer.minutes) {
-    const questions = JAMB_APP.questions[subject];
-    if (!questions || questions.length === 0) return;
-    
-    // Use up to MAX_QUESTIONS_PER_QUIZ (100) for quiz
-    const quizQuestions = [...questions]
-        .sort(() => Math.random() - 0.5)
-        .slice(0, Math.min(questionCount, JAMB_APP.MAX_QUESTIONS_PER_QUIZ));
-    
-    JAMB_APP.currentQuiz = {
-        type: 'subject',
-        subject: subject,
-        questions: quizQuestions,
-        currentIndex: 0,
-        score: 0,
-        answers: new Array(quizQuestions.length).fill(null),
-        startTime: new Date(),
-        totalTime: useTimer ? minutes * 60 : 0,
-        timerUsed: useTimer,
-        timerSetting: minutes,
-        results: null
-    };
-    
-    showQuizInterface();
-}
-
+// ================ QUIZ INTERFACE FUNCTIONS ================
 function startFullJAMBQuiz() {
     let missingQuestions = [];
     JAMB_APP.selectedSubjects.forEach(subject => {
@@ -1536,7 +1440,7 @@ function startCustomQuizWithSettings(subjectQuestions, timerSettings) {
     showQuizInterface();
 }
 
-// ================ QUIZ INTERFACE FUNCTIONS ================
+// ================ QUIZ DISPLAY FUNCTIONS ================
 function showQuizInterface() {
     const quiz = JAMB_APP.currentQuiz;
     if (!quiz) return;
@@ -1694,21 +1598,31 @@ function showQuizInterface() {
         <div class="question-box" style="background: white; padding: 25px; border-radius: 12px; box-shadow: 0 3px 10px rgba(0,0,0,0.08); margin-bottom: 20px; border: 1px solid #e0e0e0;">
     `;
     
-    // Subject indicator for JAMB quiz
+
+// Subject indicator for ALL quiz types
+const subjectInfo = JAMB_APP.allSubjects[currentSubject] || JAMB_APP.allSubjects[quiz.subject];
+if (subjectInfo) {
+    let subjectDisplayName = subjectInfo.name;
+    
+    // If it's a JAMB quiz with multiple subjects, show which one
     if (quiz.type === 'jamb') {
-        const subjectInfo = JAMB_APP.allSubjects[currentSubject];
-        html += `
-            <div style="margin-bottom: 20px; display: flex; justify-content: space-between; align-items: center; padding: 12px; background: #e8eaf6; border-radius: 8px;">
-                <span style="display: flex; align-items: center; gap: 10px; font-weight: 500; color: #6200ea;">
-                    <i class="fas fa-${subjectInfo?.icon || 'book'}"></i>
-                    ${subjectInfo?.name || currentSubject}
-                </span>
-                <span style="font-size: 14px; color: #666; background: white; padding: 5px 12px; border-radius: 15px; border: 1px solid #ddd;">
-                    Question ${subjectQuestionNumber} of ${subjectTotalQuestions} in this subject
-                </span>
-            </div>
-        `;
+        subjectDisplayName = `${subjectInfo.name} (Subject ${quiz.subjects.indexOf(currentSubject) + 1} of ${quiz.subjects.length})`;
     }
+    
+    html += `
+        <div style="margin-bottom: 20px; display: flex; justify-content: space-between; align-items: center; padding: 12px; background: #e8eaf6; border-radius: 8px;">
+            <span style="display: flex; align-items: center; gap: 10px; font-weight: 500; color: #6200ea;">
+                <i class="fas fa-${subjectInfo.icon || 'book'}"></i>
+                ${subjectDisplayName}
+            </span>
+            <span style="font-size: 14px; color: #666; background: white; padding: 5px 12px; border-radius: 15px; border: 1px solid #ddd;">
+                ${quiz.type === 'jamb' ? 
+                  `Question ${subjectQuestionNumber} of ${subjectTotalQuestions} in this subject` : 
+                  `Question ${globalQuestionNumber} of ${quiz.questions.length}`}
+            </span>
+        </div>
+    `;
+}
     
     // Question text
     html += `
@@ -1863,14 +1777,7 @@ function showQuizInterface() {
     if (quiz.timerUsed && quiz.totalTime > 0) {
         startQuizTimer(quiz.totalTime);
     }
-    
-    // Add CSS for button states
-    addQuizButtonStyles();
-    
-    switchTab('quiz');
-}
-
-// Helper function to add dynamic styles for quiz buttons
+    // Helper function to add dynamic styles for quiz buttons
 function addQuizButtonStyles() {
     const styleId = 'quiz-button-styles';
     if (document.getElementById(styleId)) return;
@@ -2005,6 +1912,12 @@ function addQuizButtonStyles() {
     
     document.head.appendChild(style);
 }
+    
+    // Add CSS for button states
+    addQuizButtonStyles();
+    
+    switchTab('quiz');
+}
 
 // Helper function to get starting index of a subject
 function getSubjectStartIndex(quiz, subject) {
@@ -2039,7 +1952,7 @@ function switchToSubject(subject) {
     showQuizInterface();
 }
 
-// NEW FUNCTION: Jump to any question
+// Jump to any question
 function jumpToQuestion(index) {
     const quiz = JAMB_APP.currentQuiz;
     if (!quiz) return;
@@ -2053,7 +1966,7 @@ function jumpToQuestion(index) {
     }
 }
 
-// NEW FUNCTION: Toggle jump menu
+// Toggle jump menu
 function toggleJumpMenu() {
     const jumpMenu = document.getElementById('jump-menu');
     if (!jumpMenu) return;
@@ -2110,7 +2023,7 @@ function toggleJumpMenu() {
     }
 }
 
-// NEW FUNCTION: Jump to specific question number
+// Jump to specific question number
 function jumpToQuestionNumber() {
     const input = document.getElementById('jump-to-number');
     if (!input) return;
@@ -2138,7 +2051,6 @@ function jumpToQuestionNumber() {
     }
 }
 
-// Update selectAnswer to allow changing answers
 function selectAnswer(answerIndex) {
     const quiz = JAMB_APP.currentQuiz;
     const current = quiz.currentIndex;
@@ -2175,7 +2087,6 @@ function selectAnswer(answerIndex) {
     showQuizInterface();
 }
 
-// Update previousQuestion to work properly
 function previousQuestion() {
     const quiz = JAMB_APP.currentQuiz;
     if (quiz.currentIndex > 0) {
@@ -2187,7 +2098,6 @@ function previousQuestion() {
     }
 }
 
-// Update nextQuestion to work properly
 function nextQuestion() {
     const quiz = JAMB_APP.currentQuiz;
     
@@ -2225,7 +2135,6 @@ document.addEventListener('click', function(event) {
     }
 });
 
-// Updated function to mark question for review
 function markForReview() {
     const quiz = JAMB_APP.currentQuiz;
     if (!quiz.review) quiz.review = [];
@@ -2377,19 +2286,19 @@ function showReviewInterface() {
         <div class="question-box">
     `;
     
-    if (quiz.type === 'jamb') {
-        const subject = currentQuestion.subject;
-        const subjectInfo = JAMB_APP.allSubjects[subject];
-        html += `
-            <div style="margin-bottom: 15px;">
-                <span class="selected-subject-tag">
-                    <i class="fas fa-${subjectInfo?.icon || 'book'}"></i>
-                    ${subjectInfo?.name || subject}
-                </span>
-            </div>
-        `;
-    }
-    
+   // Always show subject indicator
+const currentSubject = quiz.type === 'jamb' ? currentQuestion.subject : quiz.subject;
+const subjectInfo = JAMB_APP.allSubjects[currentSubject];
+if (subjectInfo) {
+    html += `
+        <div style="margin-bottom: 15px;">
+            <span class="selected-subject-tag" style="font-size: 16px; padding: 10px 20px;">
+                <i class="fas fa-${subjectInfo.icon || 'book'}"></i>
+                ${subjectInfo.name} ${quiz.type === 'subject' ? '(Practice Quiz)' : ''}
+            </span>
+        </div>
+    `;
+}
     html += `
             <div class="question-text">${currentQuestion.question}</div>
             <div class="options-grid">
@@ -3035,15 +2944,12 @@ document.addEventListener('DOMContentLoaded', function () {
     
     loadFromStorage();
     setupSubjectCheckboxes();
-    setupFileUpload();
     setupSettingsListeners();
     updateSetupUI();
     setupMobileTouchSupport();
     
-    // Load built-in questions after a short delay
-    setTimeout(() => {
-        loadBuiltInQuestions();
-    }, 500);
+    // Load questions from data folder
+    loadQuestionsFromDataFolder();
     
     // Force update UI settings after everything loads
     setTimeout(() => {
