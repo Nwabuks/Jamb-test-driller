@@ -4,11 +4,99 @@
     box-sizing: border-box;
     font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
 }
+/* ================ APK/APP SCROLLING FIXES ================ */
+
+/* Enable smooth scrolling for the entire app */
+html {
+    -webkit-overflow-scrolling: touch; /* Smooth scrolling on iOS */
+    overflow-scrolling: touch;
+}
 
 body {
-    background: linear-gradient(135deg, #1a237e 0%, #311b92 100%);
+    overflow-y: auto; /* Enable vertical scrolling */
+    -webkit-overflow-scrolling: touch; /* For iOS */
+    overscroll-behavior: contain; /* Prevent pull-to-refresh */
+}
+
+/* Fix for mobile webview scrolling */
+.container {
+    -webkit-overflow-scrolling: touch;
+    overflow-y: auto;
+}
+
+/* Fix for quiz interface scrolling */
+#quizContainer {
+    -webkit-overflow-scrolling: touch;
+    overflow-y: auto;
     min-height: 100vh;
-    padding: 20px;
+}
+
+/* Prevent text selection issues */
+* {
+    -webkit-tap-highlight-color: transparent; /* Remove tap highlight */
+    -webkit-user-select: none; /* Prevent text selection */
+    -moz-user-select: none;
+    -ms-user-select: none;
+    user-select: none;
+    -webkit-touch-callout: none; /* Prevent callout on long press */
+}
+
+/* Allow text selection in specific areas */
+.question-text,
+.option-btn,
+.explanation,
+.tab-content p {
+    -webkit-user-select: text;
+    -moz-user-select: text;
+    -ms-user-select: text;
+    user-select: text;
+}
+
+/* Fix for input elements */
+input, textarea, select {
+    -webkit-user-select: text;
+    -moz-user-select: text;
+    -ms-user-select: text;
+    user-select: text;
+    -webkit-appearance: none; /* Remove default styling on iOS */
+    -moz-appearance: none;
+    appearance: none;
+}
+
+/* Remove blue highlight on tap for mobile */
+button, a, .tab, .subject-checkbox, .topic-checkbox {
+    -webkit-tap-highlight-color: rgba(0,0,0,0);
+    outline: none;
+}
+
+/* Fix for momentum scrolling */
+.scrollable {
+    -webkit-overflow-scrolling: touch;
+    overflow-y: scroll;
+}
+
+/* Fix for fixed bottom nav on mobile */
+@media (max-width: 768px) {
+    body {
+        height: 100vh;
+        overflow: hidden; /* Prevent body scrolling */
+    }
+    
+    .container {
+        height: calc(100vh - 60px); /* Account for bottom nav */
+        overflow-y: auto;
+        -webkit-overflow-scrolling: touch;
+    }
+    
+    .tab-content {
+        max-height: calc(100vh - 120px); /* Account for header and nav */
+        overflow-y: auto;
+    }
+}
+
+body {
+    background: white; /* Changed from gradient to white */
+    min-height: 100vh;
     color: #333;
 }
 
@@ -16,9 +104,21 @@ body {
     max-width: 1000px;
     margin: 0 auto;
     background: white;
-    border-radius: 15px;
-    box-shadow: 0 10px 30px rgba(0,0,0,0.3);
     overflow: hidden;
+    min-height: 100vh; /* Full height */
+}
+
+/* Desktop view with purple background */
+@media (min-width: 769px) {
+    body {
+        background: linear-gradient(135deg, #1a237e 0%, #311b92 100%);
+        padding: 20px;
+    }
+    
+    .container {
+        border-radius: 15px;
+        box-shadow: 0 10px 30px rgba(0,0,0,0.3);
+    }
 }
 
 .header {
@@ -61,6 +161,12 @@ body {
 .tab-content {
     padding: 30px;
     display: none;
+}
+/* Desktop padding */
+@media (min-width: 769px) {
+    .tab-content {
+        padding: 30px;
+    }
 }
 
 .tab-content.active {
@@ -1535,5 +1641,279 @@ body {
     /* Results tab mobile */
     .results-grid {
         grid-template-columns: 1fr;
+    }
+}
+/* ================ MOBILE BOTTOM NAVIGATION ================ */
+@media (max-width: 768px) {
+    /* Full screen mobile layout */
+    body {
+        padding: 0;
+        background: white;
+    }
+    
+    .container {
+        margin: 0;
+        border-radius: 0;
+        box-shadow: none;
+        width: 100%;
+        max-width: 100%;
+    }
+    
+    /* Header adjustment */
+    .header {
+        padding: 20px 15px 15px;
+        background: linear-gradient(to right, #6200ea, #3700b3);
+        border-radius: 0;
+    }
+    
+    .header h1 {
+        font-size: 22px;
+        margin-bottom: 5px;
+    }
+    
+    .header p {
+        font-size: 14px;
+        opacity: 0.9;
+    }
+    
+    /* Move tabs to bottom for mobile */
+    .tabs {
+        position: fixed;
+        bottom: 0;
+        left: 0;
+        right: 0;
+        background: white;
+        border-top: 2px solid #6200ea;
+        border-bottom: none;
+        z-index: 1000;
+        display: flex;
+        flex-direction: row; /* Horizontal layout */
+        justify-content: space-around;
+        padding: 10px 0;
+        box-shadow: 0 -5px 15px rgba(0,0,0,0.1);
+        height: auto;
+    }
+    
+    .tab {
+        flex: 1;
+        padding: 10px 5px;
+        margin: 0;
+        text-align: center;
+        font-size: 12px;
+        min-height: auto;
+        display: flex;
+        flex-direction: column;
+        align-items: center;
+        justify-content: center;
+        border-radius: 8px;
+        border: none;
+        background: transparent;
+        color: #666;
+        transition: all 0.3s;
+    }
+    
+    .tab i {
+        font-size: 20px;
+        margin-bottom: 4px;
+    }
+    
+    .tab span {
+        display: block;
+        font-size: 11px;
+        font-weight: 600;
+    }
+    
+    .tab.active {
+        background: #6200ea;
+        color: white;
+        border: none;
+        transform: translateY(-8px);
+        box-shadow: 0 -3px 10px rgba(98,0,234,0.3);
+        padding: 12px 5px;
+    }
+    
+    .tab.active i {
+        color: white;
+    }
+    
+    /* Add padding to content to account for bottom nav */
+    .tab-content {
+        padding: 20px 15px;
+        padding-bottom: 80px; /* Space for bottom nav */
+    }
+    
+    /* Setup tab adjustments */
+    .setup-options {
+        padding: 15px;
+        margin: 10px 0;
+        border-radius: 10px;
+    }
+    
+    .combination-grid {
+        grid-template-columns: repeat(2, 1fr);
+        gap: 10px;
+    }
+    
+    .subject-checkbox {
+        padding: 12px 8px;
+    }
+    
+    /* Quiz tab adjustments */
+    #quizContainer {
+        padding: 10px 0;
+    }
+    
+    /* Results tab adjustments */
+    .results-grid {
+        grid-template-columns: 1fr;
+        gap: 15px;
+    }
+    
+    /* Performance charts adjustments */
+    .charts-container {
+        grid-template-columns: 1fr;
+        gap: 20px;
+    }
+    
+    .chart-card {
+        padding: 15px;
+    }
+    
+    /* Make sure tab content doesn't hide behind nav */
+    .tab-content.active {
+        min-height: calc(100vh - 60px);
+    }
+    
+    /* Fix exam mode for mobile bottom nav */
+    .exam-mode .tabs {
+        display: none !important;
+    }
+    
+    .exam-mode body {
+        padding-bottom: 0;
+    }
+    
+    /* Make quiz bottom buttons not overlap with nav */
+    .quiz-bottom-nav {
+        margin-bottom: 70px;
+        position: sticky;
+        bottom: 60px;
+        background: white;
+        padding: 15px;
+        border-top: 1px solid #ddd;
+    }
+    
+    /* Adjust custom quiz modal for mobile */
+    .modal-content {
+        margin-bottom: 80px;
+        width: 95%;
+        max-height: 85vh;
+    }
+    
+    /* Credits positioning for mobile */
+    .credits {
+        position: fixed;
+        bottom: 70px;
+        right: 10px;
+        font-size: 10px;
+        padding: 5px 10px;
+        background: rgba(98, 0, 234, 0.9);
+        color: white;
+    }
+    
+    /* Alert adjustments */
+    .alert {
+        margin: 10px 15px;
+        font-size: 14px;
+    }
+    
+    /* Subject cards in quiz tab */
+    .subject-card {
+        padding: 20px;
+        margin: 10px 0;
+    }
+    
+    /* Topics tab adjustments */
+    .topics-grid {
+        grid-template-columns: 1fr;
+        gap: 10px;
+    }
+    
+    .topic-checkbox {
+        padding: 15px;
+    }
+}
+
+/* For very small phones */
+@media (max-width: 480px) {
+    .tab {
+        font-size: 11px;
+        padding: 8px 3px;
+    }
+    
+    .tab i {
+        font-size: 18px;
+    }
+    
+    .tab span {
+        font-size: 10px;
+    }
+    
+    .tab.active {
+        padding: 10px 3px;
+        transform: translateY(-6px);
+    }
+    
+    .tab-content {
+        padding: 15px 10px;
+        padding-bottom: 75px;
+    }
+    
+    .combination-grid {
+        grid-template-columns: 1fr;
+    }
+    
+    .header h1 {
+        font-size: 20px;
+    }
+}
+
+/* For landscape mode on mobile */
+@media (max-height: 600px) and (orientation: landscape) {
+    .tabs {
+        padding: 8px 0;
+    }
+    
+    .tab {
+        padding: 6px 3px;
+    }
+    
+    .tab i {
+        font-size: 18px;
+        margin-bottom: 2px;
+    }
+    
+    .tab span {
+        font-size: 10px;
+    }
+    
+    .tab-content {
+        padding-bottom: 65px;
+    }
+    
+    .quiz-bottom-nav {
+        bottom: 50px;
+    }
+}
+
+/* Prevent horizontal scroll on mobile */
+@media (max-width: 768px) {
+    html, body {
+        overflow-x: hidden;
+        max-width: 100%;
+    }
+    
+    * {
+        max-width: 100%;
     }
 }

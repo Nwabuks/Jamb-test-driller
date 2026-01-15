@@ -49,6 +49,75 @@ window.overallChart = null;
 window.subjectChart = null;
 window.radarChart = null;
 
+// ================ APK SCROLLING FIXES ================
+function fixAPKScrolling() {
+    // Prevent default touch behavior that interferes with scrolling
+    document.addEventListener('touchmove', function(e) {
+        // Allow scrolling only on scrollable elements
+        const isScrollable = e.target.closest('.tab-content') || 
+                            e.target.closest('#quizContainer') ||
+                            e.target.closest('.container');
+        
+        if (!isScrollable && e.target.tagName !== 'INPUT' && e.target.tagName !== 'TEXTAREA') {
+            e.preventDefault();
+        }
+    }, { passive: false });
+    
+    // Fix for iOS elastic scrolling
+    document.addEventListener('touchstart', function(e) {
+        const isScrollable = e.target.closest('.tab-content') || 
+                            e.target.closest('#quizContainer') ||
+                            e.target.closest('.container');
+        
+        if (isScrollable) {
+            // Store the initial touch position
+            this.initialY = e.touches[0].clientY;
+            this.initialScrollTop = isScrollable.scrollTop;
+        }
+    });
+    
+    document.addEventListener('touchmove', function(e) {
+        const scrollable = e.target.closest('.tab-content') || 
+                          e.target.closest('#quizContainer') ||
+                          e.target.closest('.container');
+        
+        if (scrollable) {
+            const currentY = e.touches[0].clientY;
+            const deltaY = currentY - this.initialY;
+            
+            // Check if we're at the top or bottom and trying to overscroll
+            const isAtTop = scrollable.scrollTop === 0;
+            const isAtBottom = scrollable.scrollTop + scrollable.clientHeight >= scrollable.scrollHeight - 1;
+            
+            if ((isAtTop && deltaY > 0) || (isAtBottom && deltaY < 0)) {
+                e.preventDefault();
+            }
+        }
+    }, { passive: false });
+    
+    // Fix for input focus causing layout issues
+    const inputs = document.querySelectorAll('input, textarea, select');
+    inputs.forEach(input => {
+        input.addEventListener('focus', function() {
+            // Scroll the input into view
+            setTimeout(() => {
+                this.scrollIntoView({ behavior: 'smooth', block: 'center' });
+            }, 300);
+        });
+    });
+    
+    // Fix for Android keyboard covering inputs
+    window.addEventListener('resize', function() {
+        const activeElement = document.activeElement;
+        if (activeElement && (activeElement.tagName === 'INPUT' || activeElement.tagName === 'TEXTAREA')) {
+            setTimeout(() => {
+                activeElement.scrollIntoView({ behavior: 'smooth', block: 'center' });
+            }, 100);
+        }
+    });
+    
+    console.log('APK scrolling fixes applied');
+}
 // ================ EXAM MODE FUNCTIONS ================
 let examMode = false;
 let pendingExamStart = null;
@@ -1005,6 +1074,7 @@ function updateQuizTab() {
                 <button class="btn" onclick="switchTab('topics')" style="margin-top: 10px; padding: 8px 15px; font-size: 14px; background: #666;">
                     <i class="fas fa-book"></i> Check Topics
                 </button>
+            </div>
             `;
         }
         subjectsGrid.appendChild(card);
@@ -1597,32 +1667,31 @@ function showQuizInterface() {
     html += `
         <div class="question-box" style="background: white; padding: 25px; border-radius: 12px; box-shadow: 0 3px 10px rgba(0,0,0,0.08); margin-bottom: 20px; border: 1px solid #e0e0e0;">
     `;
-    
 
-// Subject indicator for ALL quiz types
-const subjectInfo = JAMB_APP.allSubjects[currentSubject] || JAMB_APP.allSubjects[quiz.subject];
-if (subjectInfo) {
-    let subjectDisplayName = subjectInfo.name;
-    
-    // If it's a JAMB quiz with multiple subjects, show which one
-    if (quiz.type === 'jamb') {
-        subjectDisplayName = `${subjectInfo.name} (Subject ${quiz.subjects.indexOf(currentSubject) + 1} of ${quiz.subjects.length})`;
+    // Subject indicator for ALL quiz types
+    const subjectInfo = JAMB_APP.allSubjects[currentSubject] || JAMB_APP.allSubjects[quiz.subject];
+    if (subjectInfo) {
+        let subjectDisplayName = subjectInfo.name;
+        
+        // If it's a JAMB quiz with multiple subjects, show which one
+        if (quiz.type === 'jamb') {
+            subjectDisplayName = `${subjectInfo.name} (Subject ${quiz.subjects.indexOf(currentSubject) + 1} of ${quiz.subjects.length})`;
+        }
+        
+        html += `
+            <div style="margin-bottom: 20px; display: flex; justify-content: space-between; align-items: center; padding: 12px; background: #e8eaf6; border-radius: 8px;">
+                <span style="display: flex; align-items: center; gap: 10px; font-weight: 500; color: #6200ea;">
+                    <i class="fas fa-${subjectInfo.icon || 'book'}"></i>
+                    ${subjectDisplayName}
+                </span>
+                <span style="font-size: 14px; color: #666; background: white; padding: 5px 12px; border-radius: 15px; border: 1px solid #ddd;">
+                    ${quiz.type === 'jamb' ? 
+                      `Question ${subjectQuestionNumber} of ${subjectTotalQuestions} in this subject` : 
+                      `Question ${globalQuestionNumber} of ${quiz.questions.length}`}
+                </span>
+            </div>
+        `;
     }
-    
-    html += `
-        <div style="margin-bottom: 20px; display: flex; justify-content: space-between; align-items: center; padding: 12px; background: #e8eaf6; border-radius: 8px;">
-            <span style="display: flex; align-items: center; gap: 10px; font-weight: 500; color: #6200ea;">
-                <i class="fas fa-${subjectInfo.icon || 'book'}"></i>
-                ${subjectDisplayName}
-            </span>
-            <span style="font-size: 14px; color: #666; background: white; padding: 5px 12px; border-radius: 15px; border: 1px solid #ddd;">
-                ${quiz.type === 'jamb' ? 
-                  `Question ${subjectQuestionNumber} of ${subjectTotalQuestions} in this subject` : 
-                  `Question ${globalQuestionNumber} of ${quiz.questions.length}`}
-            </span>
-        </div>
-    `;
-}
     
     // Question text
     html += `
@@ -1904,6 +1973,11 @@ function addQuizButtonStyles() {
                 font-size: 12px !important;
             }
             
+            .option-btn {
+                padding: 12px !important;
+                font-size: 15px !important;
+            }
+            
             .question-text {
                 font-size: 18px !important;
             }
@@ -2169,6 +2243,12 @@ function endQuiz() {
     const minutes = Math.floor(timeTaken / 60);
     const seconds = timeTaken % 60;
 
+    // Calculate scores
+    const isFullJAMB = quiz.type === 'jamb' && quiz.subjects && quiz.subjects.length >= 2;
+    const jambTotal = isFullJAMB ? 400 : 100; // Full JAMB = 400, single subject = 100
+    const jambScore = Math.round((quiz.score / quiz.questions.length) * jambTotal);
+    const jambPercentage = Math.round((jambScore / jambTotal) * 100);
+
     const result = {
         id: Date.now(),
         type: quiz.type,
@@ -2179,6 +2259,11 @@ function endQuiz() {
         totalScore: quiz.score,
         totalQuestions: quiz.questions.length,
         percentage: Math.round((quiz.score / quiz.questions.length) * 100),
+        // JAMB SCORE FIELDS
+        jambScore: jambScore,
+        jambTotal: jambTotal,
+        jambPercentage: jambPercentage,
+        isFullJAMB: isFullJAMB,
         details: {}
     };
 
@@ -2191,20 +2276,30 @@ function endQuiz() {
             const subjectCorrect = subjectAnswers.filter((answer, idx) =>
                 answer === subjectQuestions[idx].correctAnswer
             ).length;
+            
+            // Calculate JAMB score for this subject (out of 100)
+            const subjectJambScore = Math.round((subjectCorrect / subjectQuestions.length) * 100);
+            
             result.details[subject] = {
                 score: subjectCorrect,
                 total: subjectQuestions.length,
-                percentage: Math.round((subjectCorrect / subjectQuestions.length) * 100)
+                percentage: Math.round((subjectCorrect / subjectQuestions.length) * 100),
+                jambScore: subjectJambScore,
+                jambTotal: 100
             };
         });
     } else {
         // Single subject quiz
         const subject = quiz.subject;
         const subjectName = JAMB_APP.allSubjects[subject]?.name || subject;
+        const subjectJambScore = Math.round((quiz.score / quiz.questions.length) * 100);
+        
         result.details[subject] = {
             score: quiz.score,
             total: quiz.questions.length,
-            percentage: Math.round((quiz.score / quiz.questions.length) * 100)
+            percentage: Math.round((quiz.score / quiz.questions.length) * 100),
+            jambScore: subjectJambScore,
+            jambTotal: 100
         };
         result.subjectName = subjectName;
     }
@@ -2219,10 +2314,32 @@ function showQuizResults(result) {
     let html = `
         <div style="text-align: center; padding: 20px;">
             <h2><i class="fas fa-trophy"></i> Quiz Complete!</h2>
-            <div style="font-size: 48px; color: #6200ea; margin: 20px 0;">${result.percentage}%</div>
-            <p>You scored ${result.totalScore} out of ${result.totalQuestions} questions</p>
-            <p>Time taken: ${result.timeTaken}</p>
-            ${result.timerUsed ? `<p>Timer setting: ${result.timerSetting} minutes</p>` : ''}
+            
+            <!-- JAMB Score Display -->
+            <div style="background: linear-gradient(135deg, #6200ea, #3700b3); color: white; padding: 25px; border-radius: 15px; margin: 20px 0;">
+                <h3 style="margin-bottom: 15px; font-size: 22px;">
+                    <i class="fas fa-graduation-cap"></i> 
+                    ${result.isFullJAMB ? 'JAMB SCORE (OUT OF 400)' : 'SUBJECT SCORE (OUT OF 100)'}
+                </h3>
+                <div style="font-size: 64px; font-weight: bold; margin: 20px 0; color: #ff9800;">
+                    ${result.jambScore}<span style="font-size: 24px; color: rgba(255,255,255,0.8);">/${result.jambTotal}</span>
+                </div>
+                <div style="font-size: 20px; background: rgba(255,255,255,0.1); padding: 10px; border-radius: 10px;">
+                    ${result.jambPercentage}%
+                </div>
+            </div>
+            
+            <!-- Original Score -->
+            <div style="background: #f8f9fa; padding: 15px; border-radius: 10px; margin: 15px 0;">
+                <h4 style="color: #666; margin-bottom: 10px;">Raw Score</h4>
+                <div style="font-size: 28px; color: #333; font-weight: bold;">
+                    ${result.totalScore}/${result.totalQuestions} 
+                    <span style="font-size: 18px; color: #666;">(${result.percentage}%)</span>
+                </div>
+                <p>Time taken: ${result.timeTaken}</p>
+                ${result.timerUsed ? `<p>Timer setting: ${result.timerSetting} minutes</p>` : ''}
+            </div>
+            
             <div style="margin: 20px 0;">
                 <button class="btn" onclick="reviewQuiz()" style="margin: 5px;">
                     <i class="fas fa-search"></i> Review Answers
@@ -2241,13 +2358,27 @@ function showQuizResults(result) {
     `;
     Object.entries(result.details).forEach(([subject, details]) => {
         const subjectInfo = JAMB_APP.allSubjects[subject];
+        const jambPercentage = Math.round((details.jambScore / details.jambTotal) * 100);
+        
         html += `
-            <div class="result-card">
-                <div class="subject-name">
+            <div class="result-card" style="background: white; border: 2px solid #e0e0e0; border-radius: 10px; padding: 20px; text-align: center;">
+                <div class="subject-name" style="color: #6200ea; margin-bottom: 15px; font-size: 18px; font-weight: bold;">
                     <i class="fas fa-${subjectInfo?.icon || 'book'}"></i> ${subjectInfo?.name || subject}
                 </div>
-                <div class="result-score">${details.score}/${details.total}</div>
-                <div class="result-percentage">${details.percentage}%</div>
+                
+                <!-- JAMB Score for Subject -->
+                <div style="background: #e8eaf6; padding: 15px; border-radius: 8px; margin-bottom: 10px;">
+                    <div style="font-size: 12px; color: #666; margin-bottom: 5px;">JAMB Score</div>
+                    <div style="font-size: 32px; font-weight: bold; color: #6200ea;">
+                        ${details.jambScore}<span style="font-size: 16px; color: #666;">/${details.jambTotal}</span>
+                    </div>
+                    <div style="font-size: 14px; color: #666;">${jambPercentage}%</div>
+                </div>
+                
+                <!-- Raw Score -->
+                <div style="font-size: 14px; color: #333;">
+                    <strong>Raw:</strong> ${details.score}/${details.total} (${details.percentage}%)
+                </div>
             </div>
         `;
     });
@@ -2467,14 +2598,21 @@ function updateResultsTab() {
         Object.entries(result.details).forEach(([subject, details]) => {
             const subjectInfo = JAMB_APP.allSubjects[subject];
             const percentage = Math.round((details.score / details.total) * 100);
+            const jambPercentage = Math.round((details.jambScore / details.jambTotal) * 100);
+            
             detailsHtml += `
                 <div style="display: flex; justify-content: space-between; margin: 5px 0; padding: 8px; background: #f5f5f5; border-radius: 5px; align-items: center;">
                     <span style="display: flex; align-items: center; gap: 8px;">
                         <i class="fas fa-${subjectInfo?.icon || 'book'}" style="color: #6200ea;"></i>
                         ${subjectInfo?.name || subject}
                     </span>
-                    <span style="font-weight: 500; color: ${percentage >= 70 ? '#4caf50' : percentage >= 50 ? '#ff9800' : '#f44336'}">
-                        <strong>${details.score}/${details.total}</strong> (${percentage}%)
+                    <span style="text-align: right;">
+                        <div style="font-weight: 500; color: ${percentage >= 70 ? '#4caf50' : percentage >= 50 ? '#ff9800' : '#f44336'}">
+                            <strong>${details.score}/${details.total}</strong> (${percentage}%)
+                        </div>
+                        <div style="font-size: 12px; color: #666;">
+                            JAMB: ${details.jambScore}/${details.jambTotal} (${jambPercentage}%)
+                        </div>
                     </span>
                 </div>
             `;
@@ -2482,7 +2620,9 @@ function updateResultsTab() {
         const quizType = result.type === 'jamb' ? '🎯 JAMB Simulation' : '📚 Practice Quiz';
         const subjectName = result.subjectName ? ` - ${result.subjectName}` : '';
         const percentage = Math.round((result.totalScore / result.totalQuestions) * 100);
+        const jambPercentage = Math.round((result.jambScore / result.jambTotal) * 100);
         const cardColor = percentage >= 70 ? '#4caf50' : percentage >= 50 ? '#ff9800' : '#f44336';
+        const jambColor = jambPercentage >= 70 ? '#4caf50' : jambPercentage >= 50 ? '#ff9800' : '#f44336';
         
         resultCard.innerHTML = `
             <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 15px;">
@@ -2490,8 +2630,19 @@ function updateResultsTab() {
                 <span style="color: #666; font-size: 14px;">${dateStr}</span>
             </div>
             <div style="text-align: center; margin: 15px 0;">
-                <div style="font-size: 32px; font-weight: bold; color: ${cardColor};">${percentage}%</div>
-                <div>${result.totalScore}/${result.totalQuestions} questions</div>
+                <!-- JAMB Score -->
+                <div style="background: #e8eaf6; padding: 15px; border-radius: 10px; margin-bottom: 10px;">
+                    <div style="font-size: 16px; color: #6200ea; margin-bottom: 5px;">
+                        ${result.isFullJAMB ? 'JAMB Score (400)' : 'Subject Score (100)'}
+                    </div>
+                    <div style="font-size: 32px; font-weight: bold; color: ${jambColor};">${result.jambScore}<span style="font-size: 18px; color: #666;">/${result.jambTotal}</span></div>
+                    <div style="font-size: 16px; color: ${jambColor};">${jambPercentage}%</div>
+                </div>
+                
+                <!-- Raw Score -->
+                <div style="font-size: 20px; color: #333;">
+                    <strong>Raw:</strong> ${result.totalScore}/${result.totalQuestions} (${percentage}%)
+                </div>
                 <div style="color: #666; font-size: 14px;">Time: ${result.timeTaken}</div>
                 ${result.timerUsed ? `<div style="color: #666; font-size: 12px;">Timer: ${result.timerSetting} minutes</div>` : ''}
             </div>
@@ -2514,14 +2665,19 @@ function viewResultDetails(resultId) {
     if (!result) return;
     
     alert(`Detailed Result Analysis:
-Score: ${result.totalScore}/${result.totalQuestions} (${result.percentage}%)
+    
+JAMB Score: ${result.jambScore}/${result.jambTotal} (${result.jambPercentage}%)
+Raw Score: ${result.totalScore}/${result.totalQuestions} (${result.percentage}%)
 Time Taken: ${result.timeTaken}
 Date: ${new Date(result.date).toLocaleString()}
 
 Breakdown by Subject:
 ${Object.entries(result.details).map(([subject, details]) => {
     const subjectInfo = JAMB_APP.allSubjects[subject];
-    return `${subjectInfo?.name || subject}: ${details.score}/${details.total} (${Math.round((details.score/details.total)*100)}%)`;
+    const jambPercentage = Math.round((details.jambScore / details.jambTotal) * 100);
+    return `${subjectInfo?.name || subject}: 
+    - Raw: ${details.score}/${details.total} (${details.percentage}%)
+    - JAMB: ${details.jambScore}/${details.jambTotal} (${jambPercentage}%)`;
 }).join('\n')}`);
 }
 
@@ -2555,8 +2711,8 @@ function updatePerformanceAnalytics() {
             <div class="stat-label">Best Subject</div>
         </div>
         <div class="stat-box">
-            <div class="stat-value">${stats.improvementRate > 0 ? '+' : ''}${stats.improvementRate}%</div>
-            <div class="stat-label">Improvement Rate</div>
+            <div class="stat-value">${stats.averageJAMBScore}/${stats.jambTotal}</div>
+            <div class="stat-label">Avg JAMB Score</div>
         </div>
     `;
     
@@ -2571,6 +2727,8 @@ function calculatePerformanceStats() {
             averageScore: 0,
             bestSubject: 'N/A',
             improvementRate: 0,
+            averageJAMBScore: 0,
+            jambTotal: 400,
             subjectPerformance: {},
             progressData: [],
             radarData: {}
@@ -2583,6 +2741,8 @@ function calculatePerformanceStats() {
         bestSubject: '',
         bestSubjectScore: 0,
         improvementRate: 0,
+        averageJAMBScore: 0,
+        jambTotal: 0,
         subjectPerformance: {},
         progressData: [],
         radarData: {
@@ -2593,13 +2753,20 @@ function calculatePerformanceStats() {
     
     // Calculate average score and progress over time
     let totalScore = 0;
+    let totalJAMBScore = 0;
+    let totalJAMBTotal = 0;
+    
     JAMB_APP.results.forEach((result, index) => {
         totalScore += result.percentage;
+        totalJAMBScore += result.jambScore;
+        totalJAMBTotal += result.jambTotal;
         
         // Progress data for line chart
         stats.progressData.push({
             attempt: index + 1,
             score: result.percentage,
+            jambScore: result.jambScore,
+            jambTotal: result.jambTotal,
             date: new Date(result.date).toLocaleDateString()
         });
         
@@ -2611,6 +2778,8 @@ function calculatePerformanceStats() {
                     totalQuestions: 0,
                     correctAnswers: 0,
                     attempts: 0,
+                    jambScore: 0,
+                    jambTotal: 0,
                     name: JAMB_APP.allSubjects[subject]?.name || subject
                 };
             }
@@ -2618,12 +2787,16 @@ function calculatePerformanceStats() {
             stats.subjectPerformance[subject].totalScore += details.percentage;
             stats.subjectPerformance[subject].correctAnswers += details.score;
             stats.subjectPerformance[subject].totalQuestions += details.total;
+            stats.subjectPerformance[subject].jambScore += details.jambScore;
+            stats.subjectPerformance[subject].jambTotal += details.jambTotal;
             stats.subjectPerformance[subject].attempts++;
         });
     });
     
     // Calculate average score
     stats.averageScore = Math.round(totalScore / JAMB_APP.results.length);
+    stats.averageJAMBScore = Math.round(totalJAMBScore / JAMB_APP.results.length);
+    stats.jambTotal = Math.round(totalJAMBTotal / JAMB_APP.results.length);
     
     // Calculate improvement rate (compare first half vs second half)
     if (JAMB_APP.results.length >= 2) {
@@ -2640,6 +2813,8 @@ function calculatePerformanceStats() {
     // Find best subject
     Object.entries(stats.subjectPerformance).forEach(([subject, data]) => {
         const average = Math.round(data.totalScore / data.attempts);
+        const jambAverage = Math.round(data.jambScore / data.attempts);
+        
         if (average > stats.bestSubjectScore) {
             stats.bestSubjectScore = average;
             stats.bestSubject = data.name;
@@ -2683,6 +2858,7 @@ function renderCharts(stats) {
         const overallCtx = overallCanvas.getContext('2d');
         const labels = stats.progressData.map(data => `Attempt ${data.attempt}`);
         const scores = stats.progressData.map(data => data.score);
+        const jambScores = stats.progressData.map(data => Math.round((data.jambScore / data.jambTotal) * 100));
         const dates = stats.progressData.map(data => data.date);
         
         window.overallChart = new Chart(overallCtx, {
@@ -2702,23 +2878,41 @@ function renderCharts(stats) {
                     pointBorderWidth: 2,
                     pointRadius: 6,
                     pointHoverRadius: 8
+                },
+                {
+                    label: 'JAMB Score (%)',
+                    data: jambScores,
+                    borderColor: chartColors.success,
+                    backgroundColor: chartColors.success.replace('0.8', '0.1'),
+                    borderWidth: 3,
+                    fill: false,
+                    tension: 0.3,
+                    pointBackgroundColor: chartColors.success,
+                    pointBorderColor: '#fff',
+                    pointBorderWidth: 2,
+                    pointRadius: 6,
+                    pointHoverRadius: 8
                 }]
             },
             options: {
                 responsive: true,
                 maintainAspectRatio: false,
                 plugins: {
-                    legend: {
-                        display: false
-                    },
                     tooltip: {
                         callbacks: {
                             label: function(context) {
                                 const dataIndex = context.dataIndex;
-                                return [
-                                    `Score: ${context.parsed.y}%`,
-                                    `Date: ${dates[dataIndex]}`
-                                ];
+                                if (context.datasetIndex === 0) {
+                                    return [
+                                        `Score: ${context.parsed.y}%`,
+                                        `Date: ${dates[dataIndex]}`
+                                    ];
+                                } else {
+                                    return [
+                                        `JAMB Score: ${context.parsed.y}%`,
+                                        `Date: ${dates[dataIndex]}`
+                                    ];
+                                }
                             }
                         }
                     }
@@ -2754,6 +2948,9 @@ function renderCharts(stats) {
         const subjectAverages = Object.values(stats.subjectPerformance).map(data => 
             Math.round(data.totalScore / data.attempts)
         );
+        const subjectJAMB = Object.values(stats.subjectPerformance).map(data => 
+            Math.round(data.jambScore / data.attempts)
+        );
         
         window.subjectChart = new Chart(subjectCtx, {
             type: 'bar',
@@ -2762,18 +2959,16 @@ function renderCharts(stats) {
                 datasets: [{
                     label: 'Average Score (%)',
                     data: subjectAverages,
-                    backgroundColor: subjectAverages.map(score => {
-                        if (score >= 80) return chartColors.success;
-                        if (score >= 60) return chartColors.primary;
-                        if (score >= 40) return chartColors.warning;
-                        return chartColors.danger;
-                    }),
-                    borderColor: subjectAverages.map(score => {
-                        if (score >= 80) return chartColors.success.replace('0.8', '1');
-                        if (score >= 60) return chartColors.primary.replace('0.8', '1');
-                        if (score >= 40) return chartColors.warning.replace('0.8', '1');
-                        return chartColors.danger.replace('0.8', '1');
-                    }),
+                    backgroundColor: chartColors.primary.replace('0.8', '0.6'),
+                    borderColor: chartColors.primary.replace('0.8', '1'),
+                    borderWidth: 1,
+                    borderRadius: 5
+                },
+                {
+                    label: 'JAMB Score',
+                    data: subjectJAMB,
+                    backgroundColor: chartColors.success.replace('0.8', '0.6'),
+                    borderColor: chartColors.success.replace('0.8', '1'),
                     borderWidth: 1,
                     borderRadius: 5
                 }]
@@ -2782,21 +2977,15 @@ function renderCharts(stats) {
                 responsive: true,
                 maintainAspectRatio: false,
                 plugins: {
-                    legend: {
-                        display: false
-                    },
                     tooltip: {
                         callbacks: {
                             label: function(context) {
                                 const subject = stats.subjectPerformance[Object.keys(stats.subjectPerformance)[context.dataIndex]];
-                                return [
-                                    `Average: ${context.parsed.y}%`,
-                                    `Best: ${Math.max(...JAMB_APP.results
-                                        .filter(r => r.details[Object.keys(stats.subjectPerformance)[context.dataIndex]])
-                                        .map(r => r.details[Object.keys(stats.subjectPerformance)[context.dataIndex]].percentage)
-                                    )}%`,
-                                    `Attempts: ${subject.attempts}`
-                                ];
+                                if (context.datasetIndex === 0) {
+                                    return `Average: ${context.parsed.y}%`;
+                                } else {
+                                    return `JAMB: ${context.parsed.y}%`;
+                                }
                             }
                         }
                     }
@@ -2930,6 +3119,62 @@ function setupMobileTouchSupport() {
         }
     }
 }
+// ================ MOBILE NAVIGATION HANDLER ================
+function setupMobileNavigation() {
+    // Check if mobile
+    function isMobile() {
+        return window.innerWidth <= 768;
+    }
+    
+    // Update tab active state based on scroll
+    function updateActiveTabOnScroll() {
+        if (!isMobile()) return;
+        
+        const tabs = document.querySelectorAll('.tab');
+        const tabContents = document.querySelectorAll('.tab-content');
+        let activeTab = 'setup';
+        
+        // Find which tab content is most visible
+        tabContents.forEach(content => {
+            const rect = content.getBoundingClientRect();
+            if (rect.top < window.innerHeight / 2 && rect.bottom > window.innerHeight / 2) {
+                const tabName = content.id.replace('tab-', '');
+                activeTab = tabName;
+            }
+        });
+        
+        // Update active tab
+        tabs.forEach(tab => {
+            const tabText = tab.querySelector('span').textContent.toLowerCase();
+            if (tabText === activeTab) {
+                tab.classList.add('active');
+            } else {
+                tab.classList.remove('active');
+            }
+        });
+    }
+    
+    // Handle tab click animations
+    document.querySelectorAll('.tab').forEach(tab => {
+        tab.addEventListener('click', function() {
+            if (!isMobile()) return;
+            
+            // Add click feedback
+            this.style.transform = 'scale(0.95)';
+            setTimeout(() => {
+                this.style.transform = '';
+            }, 200);
+        });
+    });
+    
+    // Update on scroll
+    window.addEventListener('scroll', updateActiveTabOnScroll);
+    
+    // Initial update
+    updateActiveTabOnScroll();
+    
+    console.log('Mobile navigation initialized');
+}
 
 // ================ INITIALIZATION ================
 document.addEventListener('DOMContentLoaded', function () {
@@ -2943,10 +3188,12 @@ document.addEventListener('DOMContentLoaded', function () {
     });
     
     loadFromStorage();
+    fixAPKScrolling();
     setupSubjectCheckboxes();
     setupSettingsListeners();
     updateSetupUI();
     setupMobileTouchSupport();
+    setupMobileNavigation(); // Add this line
     
     // Load questions from data folder
     loadQuestionsFromDataFolder();

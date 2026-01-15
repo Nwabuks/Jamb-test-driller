@@ -1,13 +1,18 @@
 <!DOCTYPE html>
 <html lang="en">
 <head>
-    <meta charset="UTF-8">
+    <meta charset="UTF-8"><!-- Add these meta tags for better APK experience -->
+<meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+<meta name="mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+<meta name="theme-color" content="#6200ea">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>JAMB Test Driller</title>
     <link rel="stylesheet" href="style.css">
-    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+<link rel="stylesheet" href="css/fontawesome/css/all.min.css">
     <!-- Add Chart.js library -->
-    <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+    <script src="chart.js"></script>
     <style>
     /* Add to existing CSS */
     .exam-mode .tabs,
@@ -402,22 +407,26 @@
         </div>
     </div>
 </div>
-        
-        <!-- Tabs -->
-        <div class="tabs">
-            <div class="tab active" onclick="switchTab('setup')">
-                <i class="fas fa-cog"></i> Setup
-            </div>
-            <div class="tab" onclick="switchTab('topics')">
-                <i class="fas fa-book"></i> Topics
-            </div>
-            <div class="tab" onclick="switchTab('quiz')">
-                <i class="fas fa-play-circle"></i> Quiz
-            </div>
-            <div class="tab" onclick="switchTab('results')">
-                <i class="fas fa-chart-bar"></i> Results
-            </div>
-        </div>
+    
+<!-- Tabs -->
+<div class="tabs">
+    <div class="tab active" onclick="switchTab('setup')">
+        <i class="fas fa-cog"></i>
+        <span>Setup</span>
+    </div>
+    <div class="tab" onclick="switchTab('topics')">
+        <i class="fas fa-book"></i>
+        <span>Topics</span>
+    </div>
+    <div class="tab" onclick="switchTab('quiz')">
+        <i class="fas fa-play-circle"></i>
+        <span>Quiz</span>
+    </div>
+    <div class="tab" onclick="switchTab('results')">
+        <i class="fas fa-chart-bar"></i>
+        <span>Results</span>
+    </div>
+</div>
         
         <!-- Alert Box -->
         <div class="alert" id="alert"></div>
